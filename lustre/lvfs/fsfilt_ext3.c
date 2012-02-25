@@ -106,13 +106,8 @@ extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *, 
 
 #include "lustre_quota_fmt.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15)
-#define FSFILT_DATA_TRANS_BLOCKS(sb)      EXT3_DATA_TRANS_BLOCKS
-#define FSFILT_DELETE_TRANS_BLOCKS(sb)    EXT3_DELETE_TRANS_BLOCKS
-#else
 #define FSFILT_DATA_TRANS_BLOCKS(sb)      EXT3_DATA_TRANS_BLOCKS(sb)
 #define FSFILT_DELETE_TRANS_BLOCKS(sb)    EXT3_DELETE_TRANS_BLOCKS(sb)
-#endif
 
 /* for kernels 2.6.18 and later */
 #define FSFILT_SINGLEDATA_TRANS_BLOCKS(sb) EXT3_SINGLEDATA_TRANS_BLOCKS(sb)
@@ -866,17 +861,14 @@ static int fsfilt_ext3_sync(struct super_block *sb)
 #define EXT3_EXTENTS_FL                 0x00080000 /* Inode uses extents */
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17))
-# define fsfilt_up_truncate_sem(inode)  up(&LDISKFS_I(inode)->truncate_sem);
-# define fsfilt_down_truncate_sem(inode)  down(&LDISKFS_I(inode)->truncate_sem);
+#ifdef HAVE_EXT4_LDISKFS
+#define fsfilt_up_truncate_sem(inode) do { } while (0)
+#define fsfilt_down_truncate_sem(inode) do { } while (0)
 #else
-# ifdef HAVE_EXT4_LDISKFS
-#   define fsfilt_up_truncate_sem(inode) do{ }while(0)
-#   define fsfilt_down_truncate_sem(inode) do{ }while(0)
-# else
-#  define fsfilt_up_truncate_sem(inode)  mutex_unlock(&EXT3_I(inode)->truncate_mutex)
-#  define fsfilt_down_truncate_sem(inode)  mutex_lock(&EXT3_I(inode)->truncate_mutex)
-# endif
+#define fsfilt_up_truncate_sem(inode)   \
+        mutex_unlock(&EXT3_I(inode)->truncate_mutex)
+#define fsfilt_down_truncate_sem(inode) \
+        mutex_lock(&EXT3_I(inode)->truncate_mutex)
 #endif
 
 #ifndef EXT_ASSERT
@@ -1442,8 +1434,7 @@ static int fsfilt_ext3_write_record(struct file *file, void *buf, int bufsize,
 
 static int fsfilt_ext3_setup(struct super_block *sb)
 {
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,6)) && \
-     defined(HAVE_QUOTA_SUPPORT)) || defined(S_PDIROPS)
+#if defined(HAVE_QUOTA_SUPPORT) || defined(S_PDIROPS)
         struct ext3_sb_info *sbi = EXT3_SB(sb);
 #if 0
         sbi->dx_lock = fsfilt_ext3_dx_lock;
@@ -1457,7 +1448,7 @@ static int fsfilt_ext3_setup(struct super_block *sb)
 #endif
         if (!EXT3_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_DIR_INDEX))
                 CWARN("filesystem doesn't have dir_index feature enabled\n");
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,6)) && defined(HAVE_QUOTA_SUPPORT)
+#ifdef HAVE_QUOTA_SUPPORT
         /* enable journaled quota support */
         /* kfreed in ext3_put_super() */
         sbi->s_qf_names[USRQUOTA] = kstrdup("lquota.user.reserved", GFP_KERNEL);
@@ -1470,9 +1461,7 @@ static int fsfilt_ext3_setup(struct super_block *sb)
                 return -ENOMEM;
         }
         sbi->s_jquota_fmt = QFMT_LUSTRE;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13))
         set_opt(sbi->s_mount_opt, QUOTA);
-#endif
 #endif
         return 0;
 }

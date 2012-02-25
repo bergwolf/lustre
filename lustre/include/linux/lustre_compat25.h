@@ -41,10 +41,6 @@
 
 #ifdef __KERNEL__
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
-#error sorry, lustre requires at least linux kernel 2.6.9 or later
-#endif
-
 #include <linux/fs_struct.h>
 #include <linux/namei.h>
 #include <libcfs/linux/portals_compat25.h>
@@ -59,14 +55,10 @@
  #define SEEK_END 2
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14)
 struct ll_iattr {
         struct iattr    iattr;
         unsigned int    ia_attr_flags;
 };
-#else
-#define ll_iattr iattr
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14) */
 
 #ifdef HAVE_FS_STRUCT_RWLOCK
 # define LOCK_FS_STRUCT(fs)   cfs_write_lock(&(fs)->lock)
@@ -144,11 +136,6 @@ do {cfs_mutex_lock_nested(&(inode)->i_mutex, I_MUTEX_PARENT); } while(0)
 #else
 #define LL_SEQ_LOCK(seq) cfs_down(&(seq)->sem)
 #define LL_SEQ_UNLOCK(seq) cfs_up(&(seq)->sem)
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15)
-#define d_child d_u.d_child
-#define d_rcu d_u.d_rcu
 #endif
 
 #ifdef HAVE_DQUOTOFF_MUTEX
@@ -366,13 +353,8 @@ static inline int filemap_fdatawrite_range(struct address_space *mapping,
                 .nr_to_write = (end - start + PAGE_SIZE - 1) >> PAGE_SHIFT,
         };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
         wbc.range_start = start;
         wbc.range_end = end;
-#else
-        wbc.start = start;
-        wbc.end = end;
-#endif
 
 #ifdef HAVE_MAPPING_CAP_WRITEBACK_DIRTY
         if (!mapping_cap_writeback_dirty(mapping))

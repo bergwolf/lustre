@@ -2371,13 +2371,6 @@ void lustre_register_kill_super_cb(void (*cfs)(struct super_block *sb))
 
 /***************** FS registration ******************/
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
-struct super_block * lustre_get_sb(struct file_system_type *fs_type, int flags,
-                                   const char *devname, void * data)
-{
-        return get_sb_nodev(fs_type, flags, data, lustre_fill_super);
-}
-#else
 int lustre_get_sb(struct file_system_type *fs_type, int flags,
                   const char *devname, void * data, struct vfsmount *mnt)
 {
@@ -2385,7 +2378,6 @@ int lustre_get_sb(struct file_system_type *fs_type, int flags,
 
         return get_sb_nodev(fs_type, flags, &lmd2, lustre_fill_super, mnt);
 }
-#endif
 
 void lustre_kill_super(struct super_block *sb)
 {
