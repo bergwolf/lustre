@@ -817,5 +817,9 @@ static inline struct dentry *d_make_root(struct inode *root_inode)
 }
 #endif
 
+#ifndef HAVE_CLEAR_INODE
+#define clear_inode(i)		end_writeback(i)
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _COMPAT25_H */
