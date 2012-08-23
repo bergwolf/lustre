@@ -173,11 +173,17 @@ ll_iget_for_nfs(struct super_block *sb, struct lu_fid *fid, struct lu_fid *paren
  * 2 -- contains child file handle and parent file handle;
  * 255 -- error.
  */
+#ifndef HAVE_ENCODE_FH_PARENT
 static int ll_encode_fh(struct dentry *de, __u32 *fh, int *plen,
                         int connectable)
 {
         struct inode *inode = de->d_inode;
         struct inode *parent = de->d_parent->d_inode;
+#else
+static int ll_encode_fh(struct inode *inode, __u32 *fh, int *plen,
+                        struct inode *parent)
+{
+#endif
         struct lustre_nfs_fid *nfs_fid = (void *)fh;
         ENTRY;
 
