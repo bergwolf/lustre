@@ -168,9 +168,16 @@ struct inode *ll_iget(struct super_block *sb, ino_t hash,
 static void ll_invalidate_negative_children(struct inode *dir)
 {
 	struct dentry *dentry, *tmp_subdir;
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+	struct hlist_node *p;
+#endif
 
 	ll_lock_dcache(dir);
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+	hlist_for_each_entry(dentry, p, &dir->i_dentry, d_alias) {
+#else
 	list_for_each_entry(dentry, &dir->i_dentry, d_alias) {
+#endif
 		spin_lock(&dentry->d_lock);
 		if (!list_empty(&dentry->d_subdirs)) {
 			struct dentry *child;
@@ -342,14 +349,23 @@ void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2)
 static struct dentry *ll_find_alias(struct inode *inode, struct dentry *dentry)
 {
 	struct dentry *alias, *discon_alias, *invalid_alias;
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+	struct hlist_node *p;
 
+	if (hlist_empty(&inode->i_dentry))
+#else
 	if (list_empty(&inode->i_dentry))
+#endif
 		return NULL;
 
 	discon_alias = invalid_alias = NULL;
 
 	ll_lock_dcache(inode);
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+	hlist_for_each_entry(alias, p, &inode->i_dentry, d_alias) {
+#else
 	list_for_each_entry(alias, &inode->i_dentry, d_alias) {
+#endif
 		LASSERT(alias != dentry);
 
 		spin_lock(&alias->d_lock);
@@ -665,7 +681,11 @@ static struct inode *ll_create_node(struct inode *dir, const char *name,
         if (rc)
                 GOTO(out, inode = ERR_PTR(rc));
 
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+        LASSERT(hlist_empty(&inode->i_dentry));
+#else
         LASSERT(list_empty(&inode->i_dentry));
+#endif
 
         /* We asked for a lock on the directory, but were granted a
          * lock on the inode.  Since we finally have an inode pointer,
@@ -928,7 +948,11 @@ static void ll_get_child_fid(struct inode * dir, struct qstr *name,
 {
         struct dentry *parent, *child;
 
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+        parent = hlist_entry(dir->i_dentry.first, struct dentry, d_alias);
+#else
         parent = list_entry(dir->i_dentry.next, struct dentry, d_alias);
+#endif
         child = d_lookup(parent, name);
         if (child) {
                 if (child->d_inode)

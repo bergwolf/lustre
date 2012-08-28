@@ -612,12 +612,20 @@ int ll_get_max_mdsize(struct ll_sb_info *sbi, int *lmmsize)
 
 void ll_dump_inode(struct inode *inode)
 {
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+	struct hlist_node *tmp;
+#else
         struct list_head *tmp;
+#endif
         int dentry_count = 0;
 
         LASSERT(inode != NULL);
 
+#ifdef HAVE_DENTRY_D_ALIAS_HLIST
+        hlist_for_each(tmp, &inode->i_dentry)
+#else
         list_for_each(tmp, &inode->i_dentry)
+#endif
                 dentry_count++;
 
         CERROR("inode %p dump: dev=%s ino=%lu mode=%o count=%u, %d dentries\n",
