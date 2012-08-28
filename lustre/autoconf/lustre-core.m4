@@ -2048,6 +2048,25 @@ LB_LINUX_TRY_COMPILE([
 ])
 
 #
+# 3.4 kmap_atomic removes second argument
+# see kernel commit 1ec9c5ddc17aa398f05646abfcbaf315b544e62f
+#
+AC_DEFUN([LC_KMAP_ATOMIC_HAS_1ARG],
+[AC_MSG_CHECKING([if kmap_atomic has only 1 argument])
+LB_LINUX_TRY_COMPILE([
+	#include <linux/highmem.h>
+],[
+	kmap_atomic(NULL);
+],[
+	AC_DEFINE(HAVE_KMAP_ATOMIC_HAS_1ARG, 1,
+		  [have kmap_atomic has only 1 argument])
+	AC_MSG_RESULT([yes])
+],[
+	AC_MSG_RESULT([no])
+])
+])
+
+#
 # 3.5 renames end_writeback() back to clear_inode()...
 # see kernel commit dbd5768f87ff6fb0a4fe09c4d7b6c4a24de99430
 #
@@ -2258,6 +2277,7 @@ AC_DEFUN([LC_PROG_LINUX],
 	 # 3.4
 	 LC_TOUCH_ATIME_1ARG
 	 LC_HAVE_D_MAKE_ROOT
+	 LC_KMAP_ATOMIC_HAS_1ARG
 
 	 # 3.5
 	 LC_HAVE_CLEAR_INODE

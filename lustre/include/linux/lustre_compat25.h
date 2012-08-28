@@ -821,5 +821,13 @@ static inline struct dentry *d_make_root(struct inode *root_inode)
 #define clear_inode(i)		end_writeback(i)
 #endif
 
+#ifdef HAVE_KMAP_ATOMIC_HAS_1ARG
+#define ll_kmap_atomic(a,b)	kmap_atomic(a)
+#define ll_kunmap_atomic(a,b)	kunmap_atomic(a)
+#else
+#define ll_kmap_atomic(a,b)	kmap_atomic(a,b)
+#define ll_kunmap_atomic(a,b)	kunmap_atomic(a,b)
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _COMPAT25_H */
