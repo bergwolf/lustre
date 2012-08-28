@@ -159,8 +159,12 @@ void ll_free_sbi(struct super_block *sb)
 }
 
 static struct dentry_operations ll_d_root_ops = {
-        .d_compare = ll_dcompare,
-        .d_revalidate = ll_revalidate_nd,
+	.d_compare = ll_dcompare,
+#ifdef HAVE_IOP_ATOMIC_OPEN
+	.d_revalidate = ll_revalidate_statahead,
+#else
+	.d_revalidate = ll_revalidate_nd,
+#endif
 };
 
 static int client_common_fill_super(struct super_block *sb, char *md, char *dt,

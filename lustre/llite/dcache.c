@@ -622,6 +622,34 @@ out_sa:
         goto mark;
 }
 
+#ifdef HAVE_IOP_ATOMIC_OPEN
+/*
+ * Always trust cached dentries. Update statahead window if necessary.
+ */
+int ll_revalidate_statahead(struct dentry *dentry, unsigned int flags)
+{
+	struct inode *parent = dentry->d_parent->d_inode;
+	int unplug = 0;
+
+	ENTRY;
+	CDEBUG(D_VFSTRACE, "VFS Op:name=%s,flags=%u\n",
+			dentry->d_name.name, flags);
+
+	if (!(flags & (LOOKUP_PARENT|LOOKUP_OPEN|LOOKUP_CREATE)) &&
+	    ll_need_statahead(parent, dentry) > 0) {
+		if (flags & LOOKUP_RCU)
+			RETURN(-ECHILD);
+
+		if (dentry->d_inode == NULL)
+			unplug = 1;
+		do_statahead_enter(parent, &dentry, unplug);
+		ll_statahead_mark(parent, dentry);
+	}
+
+	RETURN(1);
+}
+
+#else /* HAVE_IOP_ATOMIC_OPEN */
 int ll_revalidate_nd(struct dentry *dentry, struct nameidata *nd)
 {
         int rc;
@@ -689,6 +717,7 @@ out_it:
 
         RETURN(rc);
 }
+#endif /* HAVE_IOP_ATOMIC_OPEN */
 
 void ll_d_iput(struct dentry *de, struct inode *inode)
 {
@@ -699,7 +728,11 @@ void ll_d_iput(struct dentry *de, struct inode *inode)
 }
 
 struct dentry_operations ll_d_ops = {
+#ifdef HAVE_IOP_ATOMIC_OPEN
+	.d_revalidate = ll_revalidate_statahead,
+#else
         .d_revalidate = ll_revalidate_nd,
+#endif
         .d_release = ll_release,
         .d_delete  = ll_ddelete,
         .d_iput    = ll_d_iput,
