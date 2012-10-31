@@ -47,8 +47,8 @@
 #include <obd_class.h>
 #include <lprocfs_status.h>
 
-#ifndef OBD_MAX_IOCTL_BUFFER
-#define OBD_MAX_IOCTL_BUFFER 8192
+#ifndef CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER
+#define CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER 8192
 #endif
 
 /* buffer MUST be at least the size of obd_ioctl_hdr */
@@ -66,11 +66,11 @@ int obd_ioctl_getdata(char **buf, int *len, void *arg)
                 RETURN(-EINVAL);
         }
 
-        if (hdr->ioc_len > OBD_MAX_IOCTL_BUFFER) {
-                CERROR("User buffer len %d exceeds %d max buffer\n",
-                       hdr->ioc_len, OBD_MAX_IOCTL_BUFFER);
-                RETURN(-EINVAL);
-        }
+	if (hdr->ioc_len > CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER) {
+		CERROR("User buffer len %d exceeds %d max buffer\n",
+		       hdr->ioc_len, CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER);
+		RETURN(-EINVAL);
+	}
 
         if (hdr->ioc_len < sizeof(struct obd_ioctl_data)) {
                 CERROR("OBD: user buffer too small for ioctl (%d)\n", hdr->ioc_len);

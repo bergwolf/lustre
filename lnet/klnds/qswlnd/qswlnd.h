@@ -84,7 +84,7 @@
                                           kqm_u.immediate.kqim_payload[*kqswnal_tunables.kqn_tx_maxcontig]))
 /* The pre-allocated tx buffer (hdr + small payload) */
 
-#define KQSW_NTXMSGPAGES        (btopr(KQSW_TX_BUFFER_SIZE) + 1 + btopr(LNET_MAX_PAYLOAD) + 1)
+#define KQSW_NTXMSGPAGES        (btopr(KQSW_TX_BUFFER_SIZE) + 1 + btopr(CONFIG_LNET_MAX_PAYLOAD) + 1)
 /* Reserve elan address space for pre-allocated and pre-mapped transmit
  * buffer and a full payload too.  Extra pages allow for page alignment */
 
@@ -92,7 +92,7 @@
 /* receive hdr/payload always contiguous and page aligned */
 #define KQSW_NRXMSGBYTES_SMALL  (KQSW_NRXMSGPAGES_SMALL * PAGE_SIZE)
 
-#define KQSW_NRXMSGPAGES_LARGE  (btopr(sizeof(lnet_msg_t) + LNET_MAX_PAYLOAD))
+#define KQSW_NRXMSGPAGES_LARGE  (btopr(sizeof(lnet_msg_t) + CONFIG_LNET_MAX_PAYLOAD))
 /* receive hdr/payload always contiguous and page aligned */
 #define KQSW_NRXMSGBYTES_LARGE  (KQSW_NRXMSGPAGES_LARGE * PAGE_SIZE)
 /* biggest complete packet we can receive (or transmit) */

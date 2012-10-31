@@ -371,11 +371,11 @@ static inline int obd_ioctl_getdata(char **buf, int *len, void *arg)
                 RETURN(-EINVAL);
         }
 
-        if (hdr.ioc_len > OBD_MAX_IOCTL_BUFFER) {
-                CERROR("User buffer len %d exceeds %d max buffer\n",
-                       hdr.ioc_len, OBD_MAX_IOCTL_BUFFER);
-                RETURN(-EINVAL);
-        }
+	if (hdr.ioc_len > CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER) {
+		CERROR("User buffer len %d exceeds %d max buffer\n",
+		       hdr.ioc_len, CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER);
+		RETURN(-EINVAL);
+	}
 
         if (hdr.ioc_len < sizeof(struct obd_ioctl_data)) {
                 CERROR("User buffer too small for ioctl (%d)\n", hdr.ioc_len);

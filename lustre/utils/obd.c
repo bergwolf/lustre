@@ -2240,10 +2240,11 @@ int jt_obd_lov_getconfig(int argc, char **argv)
                 return -errno;
         }
 
-        memset(&desc, 0, sizeof(desc));
-        obd_str2uuid(&desc.ld_uuid, argv[1]);
-        desc.ld_tgt_count = ((OBD_MAX_IOCTL_BUFFER-sizeof(data)-sizeof(desc)) /
-                             (sizeof(*uuidarray) + sizeof(*obdgens)));
+	memset(&desc, 0, sizeof(desc));
+	obd_str2uuid(&desc.ld_uuid, argv[1]);
+	desc.ld_tgt_count = ((CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER
+			      - sizeof(data) - sizeof(desc)) /
+			     (sizeof(*uuidarray) + sizeof(*obdgens)));
 
 repeat:
         uuidarray = calloc(desc.ld_tgt_count, sizeof(*uuidarray));

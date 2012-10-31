@@ -2800,11 +2800,11 @@ int llapi_obd_statfs(char *path, __u32 type, __u32 index,
                      struct obd_statfs *stat_buf,
                      struct obd_uuid *uuid_buf)
 {
-        int fd;
-        char raw[OBD_MAX_IOCTL_BUFFER] = {'\0'};
-        char *rawbuf = raw;
-        struct obd_ioctl_data data = { 0 };
-        int rc = 0;
+	int fd;
+	char raw[CONFIG_LUSTRE_OBD_MAX_IOCTL_BUFFER] = {'\0'};
+	char *rawbuf = raw;
+	struct obd_ioctl_data data = { 0 };
+	int rc = 0;
 
         data.ioc_inlbuf1 = (char *)&type;
         data.ioc_inllen1 = sizeof(__u32);
