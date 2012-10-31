@@ -1,0 +1,15 @@
+obj-m := fid.o
+fid-y := fid_handler.o fid_store.o fid_request.o lproc_fid.o fid_lib.o
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -I$(src)/../../lnet/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean

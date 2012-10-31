@@ -1,0 +1,15 @@
+obj-m := obdecho.o
+obdecho-y := echo_client.o lproc_echo.o
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -I$(src)/../../lnet/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean

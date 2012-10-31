@@ -1,0 +1,9 @@
+all:
+	make -C libcfs
+	make -C lnet
+	make -C lustre
+
+clean:
+	make -C libcfs clean
+	make -C lnet clean
+	make -C lustre clean

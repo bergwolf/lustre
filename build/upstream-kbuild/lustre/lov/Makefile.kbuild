@@ -1,0 +1,19 @@
+obj-m := lov.o
+lov-y := lov_log.o lov_obd.o lov_pack.o lproc_lov.o lov_offset.o lov_merge.o \
+	 lov_request.o lov_qos.o lov_ea.o lov_dev.o lov_object.o lov_page.o  \
+	 lov_lock.o lov_io.o lovsub_dev.o lovsub_object.o lovsub_page.o      \
+	 lovsub_lock.o lovsub_io.o lov_pool.o
+
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -I$(src)/../../lnet/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean

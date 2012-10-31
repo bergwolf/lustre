@@ -1,0 +1,16 @@
+obj-m := lnet_selftest.o
+
+lnet_selftest-y := console.o conrpc.o conctl.o framework.o timer.o rpc.o \
+		   module.o ping_test.o brw_test.o
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean
