@@ -1,0 +1,9 @@
+obj-m += fid/ lvfs/ obdclass/ ptlrpc/ obdecho/ mgc/ lov/ osc/ mdc/ lmv/ llite/ fld/
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean
