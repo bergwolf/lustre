@@ -1,0 +1,16 @@
+obj-m += ksocklnd.o
+
+ksocklnd-y := socklnd.o socklnd_cb.o socklnd_proto.o socklnd_modparams.o socklnd_lib-linux.o
+
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../../include
+ccflags-y += -I$(src)/../../../libcfs/include
+ccflags-y += -include$(src)/../../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean

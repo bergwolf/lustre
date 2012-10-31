@@ -1,0 +1,17 @@
+obj-m += osc.o
+osc-y := osc_request.o lproc_osc.o osc_dev.o osc_object.o \
+	 osc_page.o osc_lock.o osc_io.o osc_quota.o osc_cache.o
+
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -I$(src)/../../lnet/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean

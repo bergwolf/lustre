@@ -1,0 +1,16 @@
+obj-m += lvfs.o
+
+lvfs-y := lvfs_linux.o fsfilt.o lvfs_lib.o
+
+KDIR ?= /lib/modules/`uname -r`/build
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+ccflags-y += -I$(src)/../../lnet/include
+ccflags-y += -include$(src)/../../config.h
+
+default:
+	$(MAKE) -C $(KDIR) M=$$PWD
+
+clean:
+	$(MAKE) -C $(KDIR) M=$$PWD clean
