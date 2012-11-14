@@ -23,7 +23,7 @@ UNUSED_FILENAMES="auto Makefile LICENSE ChangeLog BUILDING BUGS FDL
 		  nodist modules.order Kernelenv Info.plist .gitignore
 		  socklnd_lib-darwin socklnd_lib-winnt cygwin-ioctl.h
 		  .empty lustre_ver.h.in user- libcfs_pack.h libcfs_unpack.h
-		  lltrace.h libcfsutil.h"
+		  lltrace.h libcfsutil.h tmpdiff"
 
 # 0th, sanity check
 

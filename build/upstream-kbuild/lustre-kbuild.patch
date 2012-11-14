@@ -1,0 +1,31 @@
+diff --git a/fs/Kconfig b/fs/Kconfig
+index 780725a..0254e21 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -261,6 +261,8 @@ source "fs/ncpfs/Kconfig"
+ source "fs/coda/Kconfig"
+ source "fs/afs/Kconfig"
+ source "fs/9p/Kconfig"
++source "fs/lustre/Kconfig"
++source "net/lnet/Kconfig"
+ 
+ endif # NETWORK_FILESYSTEMS
+ 
+diff --git a/fs/Makefile b/fs/Makefile
+index 9d53192..d2480a2 100644
+--- a/fs/Makefile
++++ b/fs/Makefile
+@@ -127,3 +127,4 @@ obj-$(CONFIG_F2FS_FS)		+= f2fs/
+ obj-y				+= exofs/ # Multiple modules
+ obj-$(CONFIG_CEPH_FS)		+= ceph/
+ obj-$(CONFIG_PSTORE)		+= pstore/
++obj-$(CONFIG_LUSTRE_FS)		+= lustre/
+diff --git a/net/Makefile b/net/Makefile
+index 4f4ee08..63e41bf 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -70,3 +70,4 @@ obj-$(CONFIG_CEPH_LIB)		+= ceph/
+ obj-$(CONFIG_BATMAN_ADV)	+= batman-adv/
+ obj-$(CONFIG_NFC)		+= nfc/
+ obj-$(CONFIG_OPENVSWITCH)	+= openvswitch/
++obj-$(CONFIG_LNET)		+= lnet/
