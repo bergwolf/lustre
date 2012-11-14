@@ -1,0 +1,167 @@
+#! /bin/bash
+
+MY_PWD=`pwd`
+LUSTRE_SOURCE_DIR=`pwd`
+
+LUSTRE_CLIENT_KMOD_DIRS="$LUSTRE_SOURCE_DIR/lnet $LUSTRE_SOURCE_DIR/libcfs
+			 $LUSTRE_SOURCE_DIR/lustre"
+
+usage()
+{
+	echo "usage: $0 <lustre client source> <kernel source tree>" >&2
+	exit 1
+}
+
+# 0th, sanity check
+
+[ "$#" -eq 2 ] || usage
+LUSTRE_CLIENT_DIR="$(readlink --canonicalize-existing "$1")"
+KERNEL_DIR="$(readlink --canonicalize-existing "$2")"
+
+[ -d "$LUSTRE_CLIENT_DIR" ] && [ -d "$KERNEL_DIR" ] || usage
+
+# 1st, copy lustre client code into kernel source tree
+
+echo "LUSTRE_CLIENT_DIR is $LUSTRE_CLIENT_DIR"
+echo "KERNEL_DIR is $KERNEL_DIR"
+echo -n "copying Lustre client code into kernel tree ..."
+
+cd $LUSTRE_CLIENT_DIR
+
+LUSTRE_DIRS="$KERNEL_DIR/include/linux/libcfs $KERNEL_DIR/include/linux/lnet
+	     $KERNEL_DIR/fs/lustre $KERNEL_DIR/net/lnet"
+rm -rf $LUSTRE_DIRS
+
+cp -r libcfs/include/libcfs/ "$KERNEL_DIR/include/linux/"
+cp -r lnet/include/lnet/ "$KERNEL_DIR/include/linux/"
+
+mkdir -p $KERNEL_DIR/net/lnet
+mkdir -p $KERNEL_DIR/fs/lustre
+
+cp -r lnet/klnds $KERNEL_DIR/net/lnet
+cp -r lnet/lnet $KERNEL_DIR/net/lnet
+cp -r lnet/selftest $KERNEL_DIR/net/lnet
+
+cp -r lustre/* $KERNEL_DIR/fs/lustre
+cp -r libcfs/libcfs $KERNEL_DIR/fs/lustre
+
+# change header file inclusion
+for I in $LUSTRE_DIRS; do
+	for J in `find $I -name "*.[c,h]"`;do
+		sed -i 's/include <libcfs/include <linux\/libcfs/; s/include <lnet\//include <linux\/lnet\//' $J
+	done
+done
+
+# special cases, internal header files...
+#mkdir -p $KERNEL_DIR/net/lnet/include/lnet
+#LNET_INTERNAL_HEADERS="lnet-sysctl.h socklnd.h"
+#for I in $LNET_INTERNAL_HEADERS; do
+#	mv $KERNEL_DIR/include/linux/lnet/$I $KERNEL_DIR/net/lnet/include/lnet/
+#done
+
+echo "... done"
+
+
+# 2nd, create makefile
+echo -n "creating Makefile files..."
+cat > "$KERNEL_DIR/fs/lustre/Makefile" <<"EOF"
+obj-$(CONFIG_LUSTRE_FS) := fid/ lvfs/ obdclass/ ptlrpc/ obdecho/ mgc/ lov/ \
+			   osc/ mdc/ lmv/ llite/ fld/ libcfs/
+
+EOF
+
+MAKEFILE_DIR=$KERNEL_DIR/fs/lustre/
+find $MAKEFILE_DIR -name Makefile | xargs sed -i 's/obj-m/obj-\$(CONFIG_LUSTRE_FS)/g'
+find $MAKEFILE_DIR -name Makefile | xargs sed -i "/ccflags-y.*\(libcfs\|lnet\|config\.h\)/d"
+
+cat > "$KERNEL_DIR/net/lnet/Makefile" <<"EOF"
+obj-$(CONFIG_LNET) := klnds/ lnet/ selftest/
+
+EOF
+
+cat > "$KERNEL_DIR/net/lnet/selftest/Makefile" <<"EOF"
+obj-$(CONFIG_LNET_SELFTEST) := lnet_selftest.o
+
+lnet_selftest-y := console.o conrpc.o conctl.o framework.o timer.o rpc.o \
+		   module.o ping_test.o brw_test.o
+
+ccflags-y := -I$(src)/../include
+ccflags-y += -I$(src)/../../libcfs/include
+
+EOF
+
+MAKEFILE_DIR=$KERNEL_DIR/net/lnet/
+find $MAKEFILE_DIR -name Makefile | xargs sed -i 's/obj-m/obj-\$(CONFIG_LNET)/g'
+find $MAKEFILE_DIR -name Makefile | xargs sed -i "/ccflags-y.*\(libcfs\|lnet\|config\.h\)/d"
+
+echo "... done"
+
+# 3rd, creating Kconfig files
+
+echo -n "creating Kconfig files ..."
+cat > "$KERNEL_DIR/fs/lustre/Kconfig" <<"EOF"
+config LUSTRE_FS
+	tristate "Lustre file system client support"
+	depends on STAGING && INET
+	select LNET
+	help
+	  This option enables Lustre file system client support. Choose Y
+	  here if you want to access a Lustre file system cluster. To compile
+	  this file system support as a module, choose M here: the module will
+	  be called lustre.
+
+	  To mount Lustre file systems , you also need to install the user space
+	  mount.lustre and other user space commands which can be found in the
+	  lustre-client package, available from
+	  http://downloads.whamcloud.com/public/lustre/
+
+	  Lustre file system is the most popular cluster file system in high
+	  performance computing. Source code of both kernel space and user space
+	  Lustre components can also be found at
+	  http://git.whamcloud.com/?p=fs/lustre-release.git;a=summary
+
+	  If unsure, say N.
+
+	  See also http://wiki.lustre.org/
+
+config LUSTRE_OBD_MAX_IOCTL_BUFFER
+	int "Lustre obd max ioctl buffer bytes (default 8KB)"
+	depends on LUSTRE_FS
+	default 8192
+	help
+	  This option defines the maximum size of buffer in bytes that user space
+	  applications can pass to Lustre kernel module through ioctl interface.
+
+	  If unsure, use default.
+
+EOF
+
+cat > "$KERNEL_DIR/net/lnet/Kconfig" <<"EOF"
+config LNET
+	tristate "Lustre networking subsystem"
+	depends on LUSTRE_FS
+
+config LNET_SELFTEST
+	tristate "Lustre networking self testing"
+	depends on LNET
+	help
+	  Choose Y here if you want to do lnet self testing. To compile this
+	  as a module, choose M here: the module will be called lnet_selftest.
+
+	  If unsure, say N.
+
+	  See also http://wiki.lustre.org/
+
+config LNET_MAX_PAYLOAD
+	int "Lustre lnet max transfer payload (default 2MB)"
+	depends on LUSTRE_FS
+	default "1048576"
+	help
+	  This option defines the maximum size of payload in bytes that lnet
+	  can put into its transport.
+
+	  If unsure, use default.
+
+EOF
+
+echo "... done"

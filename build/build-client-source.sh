@@ -6,7 +6,7 @@ LUSTRE_SOURCE_DIR=`pwd`
 
 TDIR=$MY_PWD/.cleanupdefs
 CONFIGH=$LUSTRE_SOURCE_DIR/config.h
-COAN=`which coan`
+COAN=`which coan 2>/dev/null`
 COAN_ARGS_FILE=$TDIR/args
 NEWSDIR=$MY_PWD/lustre-client
 MAKEFILE_DIR=$LUSTRE_SOURCE_DIR/build/upstream-kbuild
@@ -28,13 +28,18 @@ UNUSED_FILENAMES="auto Makefile LICENSE ChangeLog BUILDING BUGS FDL
 # 0th, sanity check
 
 if [ ! -x $COAN ]; then
-	echo "    $0: cannot executable coan at $COAN... exiting." >&2
+	echo "cannot executable coan at $COAN... exiting."
 	exit 1
 fi
 
-if ! [ -e $CONFIGH ]; then
-	echo "    $0: you did not run configure..." >&2
-	echo "    $0: run configure with --with-linux=$KERNEL_DIR first." >&2
+if [ x$COAN == "x" ]; then
+	echo "cannot find coan..."
+	exit 1
+fi
+
+if [ ! -e $CONFIGH ]; then
+	echo "you did not run configure..."
+	echo "run configure with --with-linux=$KERNEL_DIR first."
 	exit 1
 fi
 
