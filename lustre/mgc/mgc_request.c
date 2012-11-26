@@ -853,8 +853,10 @@ static int mgc_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
                 mgc_requeue_add(cld);
                 config_log_put(cld);
                 break;
-        default:
-                LBUG();
+	case LDLM_CB_DOWNGRADING:
+		break;
+	default:
+		LBUG();
         }
 
         RETURN(rc);

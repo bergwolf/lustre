@@ -2298,8 +2298,10 @@ int lmv_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
                         lmv_object_put(obj);
                 }
                 break;
-        default:
-                LBUG();
+	case LDLM_CB_DOWNGRADING:
+		break;
+	default:
+		LBUG();
         }
         RETURN(0);
 }

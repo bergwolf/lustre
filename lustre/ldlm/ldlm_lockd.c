@@ -814,9 +814,9 @@ int ldlm_server_blocking_ast(struct ldlm_lock *lock,
         int                     rc = 0;
         ENTRY;
 
-        if (flag == LDLM_CB_CANCELING)
-                /* Don't need to do anything here. */
-                RETURN(0);
+	if (flag == LDLM_CB_CANCELING || flag == LDLM_CB_DOWNGRADING)
+		/* Don't need to do anything here. */
+		RETURN(0);
 
         LASSERT(lock);
         LASSERT(data != NULL);

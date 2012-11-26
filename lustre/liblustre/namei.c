@@ -127,12 +127,15 @@ int llu_md_blocking_ast(struct ldlm_lock *lock,
                         RETURN(rc);
                 }
                 break;
+	case LDLM_CB_DOWNGRADING:
         case LDLM_CB_CANCELING: {
                 struct inode *inode = llu_inode_from_lock(lock);
                 struct llu_inode_info *lli;
                 struct intnl_stat *st;
-                __u64 bits = lock->l_policy_data.l_inodebits.bits;
                 struct lu_fid *fid;
+		__u64 bits = (flag == LDLM_CB_DOWNGRADING) ?
+			      ((ldlm_policy_data_t *)data)->l_inodebits.bits :
+			      lock->l_policy_data.l_inodebits.bits;
 
                 /* Invalidate all dentries associated with this inode */
                 if (inode == NULL)

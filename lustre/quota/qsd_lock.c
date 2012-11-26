@@ -195,6 +195,8 @@ static int qsd_glb_blocking_ast(struct ldlm_lock *lock,
 		qqi_putref(qqi);
 		break;
 	}
+	case LDLM_CB_DOWNGRADING:
+		break;
 	default:
 		LASSERTF(0, "invalid flags for blocking ast %d", flag);
 	}
@@ -347,6 +349,8 @@ static int qsd_id_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *de
 		OBD_FREE_PTR(env);
 		break;
 	}
+	case LDLM_CB_DOWNGRADING:
+		break;
 	default:
 		LASSERTF(0, "invalid flags for blocking ast %d", flag);
 	}

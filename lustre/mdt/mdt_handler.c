@@ -2395,7 +2395,7 @@ int mdt_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
         int rc;
         ENTRY;
 
-        if (flag == LDLM_CB_CANCELING)
+        if (flag == LDLM_CB_CANCELING || flag == LDLM_CB_DOWNGRADING)
                 RETURN(0);
         lock_res_and_lock(lock);
         if (lock->l_blocking_ast != mdt_blocking_ast) {

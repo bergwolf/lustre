@@ -1566,6 +1566,9 @@ int ost_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
 
 	ENTRY;
 
+	if (flag == LDLM_CB_DOWNGRADING)
+		RETURN(rc);
+
 	rc = lu_env_init(&env, LCT_DT_THREAD);
 	if (unlikely(rc != 0))
 		RETURN(rc);

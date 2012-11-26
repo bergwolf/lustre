@@ -1801,6 +1801,20 @@ restart:
         EXIT;
 }
 
+void ldlm_downgrade_callback(struct ldlm_lock *lock, ldlm_policy_data_t *policy)
+{
+	check_res_locked(lock->l_resource);
+	LASSERT(lock->l_flags & LDLM_FL_DOWNGRADING);
+	if (lock->l_blocking_ast) {
+		unlock_res_and_lock(lock);
+		lock->l_blocking_ast(lock, NULL, policy, LDLM_CB_DOWNGRADING);
+		lock_res_and_lock(lock);
+	} else {
+		LDLM_DEBUG(lock, "no blocking ast");
+	}
+	lock->l_flags &= ~LDLM_FL_DOWNGRADING;
+}
+
 void ldlm_cancel_callback(struct ldlm_lock *lock)
 {
         check_res_locked(lock->l_resource);

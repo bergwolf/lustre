@@ -233,11 +233,14 @@ typedef enum {
  * Used by MGC locks, they are cancelled only at unmount or by callback. */
 #define LDLM_FL_NO_LRU		0x1000000000000ULL
 
+/* lock is being downgraded. */
+#define LDLM_FL_DOWNGRADING	0x2000000000000ULL
 
-/* The blocking callback is overloaded to perform two functions.  These flags
+/* The blocking callback is overloaded to perform three functions.  These flags
  * indicate which operation should be performed. */
 #define LDLM_CB_BLOCKING    1
 #define LDLM_CB_CANCELING   2
+#define LDLM_CB_DOWNGRADING 3
 
 /* compatibility matrix */
 #define LCK_COMPAT_EX  LCK_NL
@@ -1094,6 +1097,7 @@ void ldlm_lock2handle(const struct ldlm_lock *lock,
                       struct lustre_handle *lockh);
 struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *, __u64 flags);
 void ldlm_cancel_callback(struct ldlm_lock *);
+void ldlm_downgrade_callback(struct ldlm_lock *, ldlm_policy_data_t *);
 int ldlm_lock_remove_from_lru(struct ldlm_lock *);
 int ldlm_lock_set_data(struct lustre_handle *, void *);
 

@@ -650,7 +650,8 @@ static int osc_dlm_blocking_ast0(const struct lu_env *env,
         int result;
         int cancel;
 
-        LASSERT(flag == LDLM_CB_BLOCKING || flag == LDLM_CB_CANCELING);
+	LASSERT(flag == LDLM_CB_BLOCKING || flag == LDLM_CB_CANCELING ||
+		flag == LDLM_CB_DOWNGRADING);
 
         cancel = 0;
         olck = osc_ast_data_get(dlmlock);

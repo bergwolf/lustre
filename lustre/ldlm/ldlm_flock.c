@@ -698,6 +698,8 @@ int ldlm_flock_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
         ENTRY;
 
         LASSERT(lock);
+	if (flag == LDLM_CB_DOWNGRADING)
+		RETURN(0);
         LASSERT(flag == LDLM_CB_CANCELING);
 
 	/* take lock off the deadlock detection hash list. */

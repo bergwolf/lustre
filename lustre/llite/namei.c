@@ -203,10 +203,13 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
                         RETURN(rc);
                 }
                 break;
+	case LDLM_CB_DOWNGRADING:
         case LDLM_CB_CANCELING: {
                 struct inode *inode = ll_inode_from_lock(lock);
                 struct ll_inode_info *lli;
-                __u64 bits = lock->l_policy_data.l_inodebits.bits;
+		__u64 bits = (flag == LDLM_CB_DOWNGRADING) ?
+			      ((ldlm_policy_data_t *)data)->l_inodebits.bits :
+			      lock->l_policy_data.l_inodebits.bits;
                 struct lu_fid *fid;
                 ldlm_mode_t mode = lock->l_req_mode;
 
@@ -214,7 +217,8 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
                 if (inode == NULL)
                         break;
 
-                LASSERT(lock->l_flags & LDLM_FL_CANCELING);
+                LASSERT(lock->l_flags &
+			(LDLM_FL_CANCELING | LDLM_FL_DOWNGRADING));
                 /* For OPEN locks we differentiate between lock modes
 		 * LCK_CR, LCK_CW, LCK_PR - bug 22891 */
 		if (bits & (MDS_INODELOCK_LOOKUP | MDS_INODELOCK_UPDATE |

@@ -91,12 +91,15 @@ int llu_extent_lock_cancel_cb(struct ldlm_lock *lock,
         int rc;
         ENTRY;
 
-        if ((unsigned long)data > 0 && (unsigned long)data < 0x1000) {
+        if ((unsigned long)data > 0 && (unsigned long)data < 0x1000 &&
+	    flag != LDLM_CB_DOWNGRADING) {
                 LDLM_ERROR(lock, "cancelling lock with bad data %p", data);
                 LBUG();
         }
 
         switch (flag) {
+	case LDLM_CB_DOWNGRADING:
+		break;
         case LDLM_CB_BLOCKING:
                 ldlm_lock2handle(lock, &lockh);
                 rc = ldlm_cli_cancel(&lockh);

@@ -331,10 +331,10 @@ int ldlm_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
 {
         ENTRY;
 
-        if (flag == LDLM_CB_CANCELING) {
-                /* Don't need to do anything here. */
-                RETURN(0);
-        }
+	if (flag == LDLM_CB_CANCELING || flag == LDLM_CB_DOWNGRADING) {
+		/* Don't need to do anything here. */
+		RETURN(0);
+	}
 
         lock_res_and_lock(lock);
         /* Get this: if ldlm_blocking_ast is racing with intent_policy, such
@@ -1301,6 +1301,21 @@ int ldlm_cli_cancel(struct lustre_handle *lockh)
 }
 EXPORT_SYMBOL(ldlm_cli_cancel);
 
+/* Downgrade ibits locks for locks in @downgrades. */
+static void
+ldlm_cli_downgrade_ibits_list(cfs_list_t *downgrades,
+			      ldlm_policy_data_t *policy)
+{
+        struct ldlm_lock *lock, *next;
+
+	cfs_list_for_each_entry_safe(lock, next, downgrades, l_bl_ast) {
+                lock_res_and_lock(lock);
+		cfs_list_del_init(&lock->l_bl_ast);
+		ldlm_downgrade_callback(lock, policy);
+                unlock_res_and_lock(lock);
+	}
+}
+
 /* XXX until we will have compound requests and can cut cancels from generic rpc
  * we need send cancels with LDLM_FL_BL_AST flag as separate rpc */
 int ldlm_cli_cancel_list_local(cfs_list_t *cancels, int count,
@@ -1726,7 +1741,8 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
                                ldlm_cancel_flags_t cancel_flags, void *opaque)
 {
         struct ldlm_lock *lock;
-        int count = 0;
+        int cancel_count = 0, downgrade_count = 0;
+        CFS_LIST_HEAD(downgrades);
         ENTRY;
 
         lock_res(res);
@@ -1744,18 +1760,32 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
                 /* If somebody is already doing CANCEL, or blocking ast came,
                  * skip this lock. */
                 if (lock->l_flags & LDLM_FL_BL_AST ||
-                    lock->l_flags & LDLM_FL_CANCELING)
+                    lock->l_flags & LDLM_FL_CANCELING ||
+		    lock->l_flags & LDLM_FL_DOWNGRADING)
                         continue;
 
                 if (lockmode_compat(lock->l_granted_mode, mode))
                         continue;
 
-                /* If policy is given and this is IBITS lock, add to list only
-                 * those locks that match by policy. */
-                if (policy && (lock->l_resource->lr_type == LDLM_IBITS) &&
-                    !(lock->l_policy_data.l_inodebits.bits &
-                      policy->l_inodebits.bits))
-                        continue;
+                /*
+		 * If policy is given and this is IBITS lock, add to list only
+                 * those locks that match by policy.
+		 * For partialy matched locks, add to downgrade list.
+		 */
+                if (policy && (lock->l_resource->lr_type == LDLM_IBITS)) {
+			if (!(lock->l_policy_data.l_inodebits.bits &
+			      policy->l_inodebits.bits))
+				continue;
+			if (lock->l_policy_data.l_inodebits.bits !=
+			    policy->l_inodebits.bits) {
+				lock->l_flags |= LDLM_FL_DOWNGRADING;
+				LASSERT(cfs_list_empty(&lock->l_bl_ast));
+				cfs_list_add(&lock->l_bl_ast, &downgrades);
+				LDLM_LOCK_GET(lock);
+				downgrade_count++;
+				continue;
+			}
+		}
 
                 /* See CBPENDING comment in ldlm_cancel_lru */
                 lock->l_flags |= LDLM_FL_CBPENDING | LDLM_FL_CANCELING |
@@ -1764,11 +1794,13 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
                 LASSERT(cfs_list_empty(&lock->l_bl_ast));
                 cfs_list_add(&lock->l_bl_ast, cancels);
                 LDLM_LOCK_GET(lock);
-                count++;
+                cancel_count++;
         }
         unlock_res(res);
 
-        RETURN(ldlm_cli_cancel_list_local(cancels, count, cancel_flags));
+	if (! cfs_list_empty(&downgrades))
+		ldlm_cli_downgrade_ibits_list(&downgrades, policy);
+        RETURN(ldlm_cli_cancel_list_local(cancels, cancel_count, cancel_flags));
 }
 EXPORT_SYMBOL(ldlm_cancel_resource_local);
 
