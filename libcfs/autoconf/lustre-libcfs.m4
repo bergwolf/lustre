@@ -500,18 +500,19 @@ LB_LINUX_TRY_COMPILE([
 ])
 
 # 2.6.27 have second argument to sock_map_fd
-AC_DEFUN([LIBCFS_SOCK_MAP_FD_2ARG],
-[AC_MSG_CHECKING([sock_map_fd have second argument])
+# 3.7 (56b31d1c) un-exported sock_map_fd in favor of sock_alloc_file
+AC_DEFUN([LIBCFS_SOCK_ALLOC_FILE],
+[AC_MSG_CHECKING([sock_alloc_file is exported])
 LB_LINUX_TRY_COMPILE([
 	#include <linux/net.h>
 ],[
-        sock_map_fd(NULL, 0);
+	sock_alloc_file(NULL, 0, NULL);
 ],[
-        AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_SOCK_MAP_FD_2ARG, 1,
-                  [sock_map_fd have second argument])
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SOCK_ALLOC_FILE, 1,
+		  [sock_alloc_file is exported])
 ],[
-        AC_MSG_RESULT(NO)
+	AC_MSG_RESULT(NO)
 ])
 ])
 
@@ -824,7 +825,6 @@ LIBCFS_CPU_TOPOLOGY
 LIBCFS_STRUCT_SHASH_ALG
 # 2.6.30
 LIBCFS_FUNC_UNSHARE_FS_STRUCT
-LIBCFS_SOCK_MAP_FD_2ARG
 # 2.6.31
 LIBCFS_HAVE_SET_MEMS_ALLOWED
 # 2.6.32
@@ -840,6 +840,8 @@ LIBCFS_ADD_WAIT_QUEUE_EXCLUSIVE
 LC_SK_SLEEP
 # 2.6.40 fc15
 LC_SHRINK_CONTROL
+# 3.7
+LIBCFS_SOCK_ALLOC_FILE
 ])
 
 #

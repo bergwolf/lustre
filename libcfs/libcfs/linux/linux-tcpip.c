@@ -49,7 +49,9 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
 {
         mm_segment_t   oldmm = get_fs();
         struct socket  *sock;
+#ifndef HAVE_SOCK_ALLOC_FILE
         int             fd;
+#endif
         int             rc;
         struct file     *sock_filp;
 
@@ -59,11 +61,8 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
                 return rc;
         }
 
-#ifdef HAVE_SOCK_MAP_FD_2ARG
+#ifndef HAVE_SOCK_ALLOC_FILE
         fd = sock_map_fd(sock,0);
-#else
-        fd = sock_map_fd(sock);
-#endif
         if (fd < 0) {
                 rc = fd;
                 sock_release(sock);
@@ -75,7 +74,13 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
                 rc = -ENOMEM;
                 goto out_fd;
         }
-
+#else
+	sock_filp = sock_alloc_file(sock, 0, NULL);
+	if (IS_ERR(sock_filp)) {
+		rc = PTR_ERR(sock_filp);
+		goto out;
+	}
+#endif
 	set_fs(KERNEL_DS);
 	if (sock_filp->f_op->unlocked_ioctl)
 		rc = sock_filp->f_op->unlocked_ioctl(sock_filp, cmd, arg);
@@ -83,8 +88,10 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
 
         fput(sock_filp);
 
+#ifndef HAVE_SOCK_ALLOC_FILE
  out_fd:
         sys_close(fd);
+#endif
  out:
         return rc;
 }
