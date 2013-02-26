@@ -2236,6 +2236,24 @@ LB_LINUX_TRY_COMPILE([
 ])
 
 #
+# 3.7 unexports sock_map_fd() and exports sock_alloc_file
+# see upstream commit 56b31d1
+#
+AC_DEFUN([LC_HAVE_SOCK_MAP_FD],
+	[LB_CHECK_SYMBOL_EXPORT([sock_map_fd],
+	[net/socket.c],
+        [AC_DEFINE(HAVE_SOCK_MAP_FD, 1,
+		   [sock_map_fd is exported by the kernel])])
+])
+
+AC_DEFUN([LC_HAVE_SOCK_ALLOC_FILE],
+	[LB_CHECK_SYMBOL_EXPORT([sock_alloc_file],
+	[net/socket.c],
+        [AC_DEFINE(HAVE_SOCK_ALLOC_FILE, 1,
+		   [sock_alloc_file is exported by the kernel])])
+])
+
+#
 # LC_PROG_LINUX
 #
 # Lustre linux kernel checks
@@ -2415,6 +2433,8 @@ AC_DEFUN([LC_PROG_LINUX],
 
 	 # 3.7
 	 LC_HAVE_POSIX_ACL_NAMESPACE
+	 LC_HAVE_SOCK_MAP_FD
+	 LC_HAVE_SOCK_ALLOC_FILE
 
 	 #
 	 if test x$enable_server = xyes ; then
