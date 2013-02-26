@@ -448,7 +448,11 @@ static int mdc_unpack_acl(struct ptlrpc_request *req, struct lustre_md *md)
         if (!buf)
                 RETURN(-EPROTO);
 
-        acl = posix_acl_from_xattr(buf, body->aclsize);
+#ifdef HAVE_POSIX_ACL_NAMESPACE
+	acl = posix_acl_from_xattr(&init_user_ns, buf, body->aclsize);
+#else
+	acl = posix_acl_from_xattr(buf, body->aclsize);
+#endif
         if (IS_ERR(acl)) {
                 rc = PTR_ERR(acl);
                 CERROR("convert xattr to acl: %d\n", rc);

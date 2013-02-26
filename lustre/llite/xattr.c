@@ -345,7 +345,11 @@ int ll_getxattr_common(struct inode *inode, const char *name,
                 if (!acl)
                         RETURN(-ENODATA);
 
-                rc = posix_acl_to_xattr(acl, buffer, size);
+#ifdef HAVE_POSIX_ACL_NAMESPACE
+		rc = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
+#else
+		rc = posix_acl_to_xattr(acl, buffer, size);
+#endif
                 posix_acl_release(acl);
                 RETURN(rc);
         }
