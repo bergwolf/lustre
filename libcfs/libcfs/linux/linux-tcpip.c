@@ -41,6 +41,40 @@
 #include <linux/if.h>
 #include <linux/in.h>
 #include <linux/file.h>
+#ifdef HAVE_SOCK_ALLOC_FILE
+int
+libcfs_sock_ioctl(int cmd, unsigned long arg)
+{
+	mm_segment_t   oldmm = get_fs();
+	struct socket  *sock;
+	int             rc;
+	struct file     *sock_filp;
+
+	rc = sock_create(PF_INET, SOCK_STREAM, 0, &sock);
+	if (rc != 0) {
+		CERROR("Can't create socket: %d\n", rc);
+		return rc;
+	}
+
+	sock_filp = sock_alloc_file(sock, 0, NULL);
+	if (IS_ERR(sock_filp)) {
+		rc = PTR_ERR(sock_filp);
+		sock_release(sock);
+		goto out;
+	}
+	get_file(sock_filp);
+
+	set_fs(KERNEL_DS);
+	if (sock_filp->f_op->unlocked_ioctl)
+		rc = sock_filp->f_op->unlocked_ioctl(sock_filp, cmd, arg);
+	set_fs(oldmm);
+
+	fput(sock_filp);
+out:
+	return rc;
+}
+#else /* !HAVE_SOCK_ALLOC_FILE */
+
 /* For sys_open & sys_close */
 #include <linux/syscalls.h>
 
@@ -61,8 +95,10 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
 
 #ifdef HAVE_SOCK_MAP_FD_2ARG
         fd = sock_map_fd(sock,0);
-#else
+#elif defined(HAVE_SOCK_MAP_FD)
         fd = sock_map_fd(sock);
+#else
+#error "Cannot find either sock_map_fd nor sock_alloc_file!"
 #endif
         if (fd < 0) {
                 rc = fd;
@@ -88,6 +124,7 @@ libcfs_sock_ioctl(int cmd, unsigned long arg)
  out:
         return rc;
 }
+#endif /* !HAVE_SOCK_ALLOC_FILE */
 
 int
 libcfs_ipif_query (char *name, int *up, __u32 *ip, __u32 *mask)
