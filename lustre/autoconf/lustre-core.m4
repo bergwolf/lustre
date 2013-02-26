@@ -328,6 +328,7 @@ AC_TRY_RUN([
         #define __LINUX_POSIX_ACL_H
 
         #ifdef CONFIG_FS_POSIX_ACL
+	struct user_namespace;
         # include <linux/posix_acl_xattr.h>
         #endif
 
@@ -2213,6 +2214,28 @@ LB_LINUX_TRY_COMPILE([
 ])
 
 #
+# 3.7 posix acl supports user ns
+# see upstream commit 5f3a4a28
+#
+AC_DEFUN([LC_HAVE_POSIX_ACL_NAMESPACE],
+[AC_MSG_CHECKING([if posix acl supports user namespace])
+LB_LINUX_TRY_COMPILE([
+	#include <linux/fs.h>
+	#include <linux/posix_acl_xattr.h>
+	#include <linux/user_namespace.h>
+],[
+	struct user_namespace *user_ns;
+	posix_acl_from_xattr(user_ns, NULL, 0);
+],[
+	AC_DEFINE(HAVE_POSIX_ACL_NAMESPACE, 1,
+		  [have posix acl supports user namespace])
+	AC_MSG_RESULT([yes])
+],[
+	AC_MSG_RESULT([no])
+])
+])
+
+#
 # LC_PROG_LINUX
 #
 # Lustre linux kernel checks
@@ -2389,6 +2412,9 @@ AC_DEFUN([LC_PROG_LINUX],
 	 LC_HAVE_DENTRY_D_ALIAS_HLIST
 	 LC_DENTRY_OPEN_USE_PATH
 	 LC_HAVE_IOP_ATOMIC_OPEN
+
+	 # 3.7
+	 LC_HAVE_POSIX_ACL_NAMESPACE
 
 	 #
 	 if test x$enable_server = xyes ; then

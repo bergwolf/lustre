@@ -452,8 +452,17 @@ static inline size_t posix_acl_xattr_size(int count)
                sizeof(posix_acl_xattr_entry);
 }
 
+#ifdef HAVE_POSIX_ACL_NAMESPACE
+struct user_namespace {};
+struct user_namespace init_user_ns;
+
 static inline
-struct posix_acl * posix_acl_from_xattr(const void *value, size_t size)
+struct posix_acl *posix_acl_from_xattr(struct user_namespace *user_ns,
+					const void *value, size_t size)
+#else
+static inline
+struct posix_acl *posix_acl_from_xattr(const void *value, size_t size)
+#endif
 {
         return NULL;
 }
