@@ -218,7 +218,7 @@ static int mdt_ck_thread_main(void *args)
         int                     rc;
         ENTRY;
 
-        cfs_daemonize_ctxt("mdt_ck");
+	cfs_unshare_fs_struct();
         cfs_block_allsigs();
 
         thread_set_flags(thread, SVC_RUNNING);
@@ -291,13 +291,13 @@ static int mdt_ck_thread_main(void *args)
 int mdt_ck_thread_start(struct mdt_device *mdt)
 {
         struct ptlrpc_thread *thread = &mdt->mdt_ck_thread;
-        int rc;
+	cfs_task_t *task;
 
         cfs_waitq_init(&thread->t_ctl_waitq);
-        rc = cfs_create_thread(mdt_ck_thread_main, mdt, CFS_DAEMON_FLAGS);
-        if (rc < 0) {
+	 task = cfs_kthread_run(mdt_ck_thread_main, mdt, "mdt_ck");
+	 if (IS_ERR(task)) {
                 CERROR("cannot start mdt_ck thread, rc = %d\n", rc);
-                return rc;
+		 return PTR_ERR(task);
         }
 
         l_wait_condition(thread->t_ctl_waitq, thread_is_running(thread));

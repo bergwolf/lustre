@@ -1981,13 +1981,7 @@ static int target_recovery_thread(void *arg)
         int rc = 0;
         ENTRY;
 
-        cfs_daemonize_ctxt("tgt_recov");
-
-        SIGNAL_MASK_LOCK(current, flags);
-        sigfillset(&current->blocked);
-        RECALC_SIGPENDING;
-        SIGNAL_MASK_UNLOCK(current, flags);
-
+	cfs_unshare_fs_struct();
         OBD_ALLOC_PTR(thread);
         if (thread == NULL)
                 RETURN(-ENOMEM);
@@ -2121,11 +2115,13 @@ static int target_start_recovery_thread(struct lu_target *lut,
 	init_completion(&trd->trd_finishing);
         trd->trd_recovery_handler = handler;
 
-        if (cfs_create_thread(target_recovery_thread, lut, 0) > 0) {
+	if (!IS_ERR(cfs_kthread_run(target_recovery_thread,
+				    lut, "tgt_recov"))) {
 		wait_for_completion(&trd->trd_starting);
-                LASSERT(obd->obd_recovering != 0);
-        } else
-                rc = -ECHILD;
+		LASSERT(obd->obd_recovering != 0);
+	 } else {
+		rc = -ECHILD;
+	}
 
         return rc;
 }

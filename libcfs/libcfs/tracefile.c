@@ -992,7 +992,6 @@ static int tracefiled(void *arg)
 
         /* we're started late enough that we pick up init's fs context */
         /* this is so broken in uml?  what on earth is going on? */
-        cfs_daemonize("ktracefiled");
 
 	spin_lock_init(&pc.pc_lock);
 	complete(&tctl->tctl_start);
@@ -1106,10 +1105,10 @@ int cfs_trace_start_thread(void)
         cfs_waitq_init(&tctl->tctl_waitq);
         cfs_atomic_set(&tctl->tctl_shutdown, 0);
 
-        if (cfs_create_thread(tracefiled, tctl, 0) < 0) {
-                rc = -ECHILD;
-                goto out;
-        }
+	if (IS_ERR(cfs_kthread_run(tracefiled, tctl, "ktracefiled"))) {
+		rc = -ECHILD;
+		goto out;
+	}
 
 	wait_for_completion(&tctl->tctl_start);
         thread_running = 1;

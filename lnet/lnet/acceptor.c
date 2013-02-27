@@ -398,7 +398,6 @@ lnet_accept(cfs_socket_t *sock, __u32 magic)
 int
 lnet_acceptor(void *arg)
 {
-        char           name[16];
         cfs_socket_t  *newsock;
         int            rc;
         __u32          magic;
@@ -408,8 +407,6 @@ lnet_acceptor(void *arg)
 
         LASSERT (lnet_acceptor_state.pta_sock == NULL);
 
-        snprintf(name, sizeof(name), "acceptor_%03d", accept_port);
-        cfs_daemonize(name);
         cfs_block_allsigs();
 
         rc = libcfs_sock_listen(&lnet_acceptor_state.pta_sock,
@@ -541,9 +538,11 @@ lnet_acceptor_start(void)
         if (lnet_count_acceptor_nis() == 0)  /* not required */
                 return 0;
 
-        rc2 = cfs_create_thread(lnet_acceptor, (void *)(ulong_ptr_t)secure, 0);
-        if (rc2 < 0) {
-                CERROR("Can't start acceptor thread: %d\n", rc);
+	rc2 = PTR_ERR(cfs_kthread_run(lnet_acceptor,
+				      (void *)(ulong_ptr_t)secure,
+				      "acceptor_%03ld", secure));
+        if (IS_ERR_VALUE(rc2)) {
+                CERROR("Can't start acceptor thread: %ld\n", rc2);
 		mt_fini_completion(&lnet_acceptor_state.pta_signal);
 
                 return -ESRCH;
