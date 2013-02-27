@@ -2254,6 +2254,31 @@ AC_DEFUN([LC_HAVE_SOCK_ALLOC_FILE],
 ])
 
 #
+# 3.7 vfs introduces struct filename and changes getname/putname
+# parameter to use it
+# see kernel commit adb5c247 and 91a27b2a
+#
+AC_DEFUN([LC_HAVE_STRUCT_FILENAME],
+[AC_MSG_CHECKING([if vfs has struct filename])
+tmp_flags="$EXTRA_KCFLAGS"
+EXTRA_KCFLAGS="-Werror"
+LB_LINUX_TRY_COMPILE([
+	#include <linux/fs.h>
+],[
+	struct filename *filename;
+	filename = getname(NULL);
+	putname(filename);
+],[
+	AC_DEFINE(HAVE_STRUCT_FILENAME, 1,
+		  [vfs has struct filename])
+	AC_MSG_RESULT([yes])
+],[
+	AC_MSG_RESULT([no])
+])
+EXTRA_KCFLAGS="$tmp_flags"
+])
+
+#
 # LC_PROG_LINUX
 #
 # Lustre linux kernel checks
@@ -2435,6 +2460,7 @@ AC_DEFUN([LC_PROG_LINUX],
 	 LC_HAVE_POSIX_ACL_NAMESPACE
 	 LC_HAVE_SOCK_MAP_FD
 	 LC_HAVE_SOCK_ALLOC_FILE
+	 LC_HAVE_STRUCT_FILENAME
 
 	 #
 	 if test x$enable_server = xyes ; then

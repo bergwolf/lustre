@@ -750,4 +750,46 @@ static inline struct dentry *d_make_root(struct inode *root)
 }
 #endif
 
+#ifndef HAVE_STRUCT_FILENAME
+struct filename {
+	char	*name;
+};
+static inline struct filename *ll_getname(const char __user *name)
+{
+	struct filename *filename;
+
+	filename = kmalloc(sizeof(struct filename), GFP_KERNEL);
+	if (filename == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	filename->name = getname(name);
+	if (unlikely(IS_ERR(filename->name))) {
+		int err = PTR_ERR(filename->name);
+		kfree(filename);
+		return ERR_PTR(err);
+	} else {
+		return filename;
+	}
+}
+static inline void ll_putname(struct filename *filename)
+{
+	putname(filename->name);
+	kfree(filename);
+}
+#else
+static inline struct filename *ll_getname(const char __user *name)
+{
+	return getname(name);
+}
+static inline void ll_putname(struct filename *name)
+{
+	if (name->separate) {
+		__putname(name->name);
+		kfree(name);
+	} else {
+		__putname(name);
+	}
+}
+#endif /* !HAVE_STRUCT_FILENAME */
+
 #endif /* _COMPAT25_H */
