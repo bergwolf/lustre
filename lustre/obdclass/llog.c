@@ -440,7 +440,7 @@ static int llog_process_thread_daemonize(void *arg)
 	struct lu_env			 env;
 	int				 rc;
 
-	cfs_daemonize_ctxt("llog_process_thread");
+	cfs_unshare_fs_struct();
 
 	/* client env has no keys, tags is just 0 */
 	rc = lu_env_init(&env, LCT_LOCAL | LCT_MG_THREAD);
@@ -482,9 +482,9 @@ int llog_process_or_fork(const struct lu_env *env,
 		 * init the new one in llog_process_thread_daemonize. */
 		lpi->lpi_env = NULL;
 		init_completion(&lpi->lpi_completion);
-		rc = cfs_create_thread(llog_process_thread_daemonize, lpi,
-				       CFS_DAEMON_FLAGS);
-		if (rc < 0) {
+		rc = PTR_ERR(cfs_kthread_run(llog_process_thread_daemonize, lpi,
+					     "llog_process_thread"));
+		if (IS_ERR_VALUE(rc)) {
 			CERROR("%s: cannot start thread: rc = %d\n",
 			       loghandle->lgh_ctxt->loc_obd->obd_name, rc);
 			OBD_FREE_PTR(lpi);

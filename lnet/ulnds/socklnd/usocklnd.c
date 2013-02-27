@@ -296,10 +296,11 @@ usocklnd_base_startup()
         pthread_rwlock_init(&usock_data.ud_peers_lock, NULL);
 
         /* Spawn poll threads */
-        for (i = 0; i < usock_data.ud_npollthreads; i++) {
-                rc = cfs_create_thread(usocklnd_poll_thread,
-                                       &usock_data.ud_pollthreads[i], 0);
-                if (rc) {
+	for (i = 0; i < usock_data.ud_npollthreads; i++) {
+		rc = PTR_ERR(cfs_kthread_run(usocklnd_poll_thread,
+					     &usock_data.ud_pollthreads[i],
+					     ""));
+		if (IS_ERR_VALUE(rc)) {
                         usocklnd_base_shutdown(i);
                         return rc;
                 }

@@ -362,7 +362,6 @@ kgnilnd_ruhroh_thread(void *arg)
 	int                i = 1;
 	DEFINE_WAIT(wait);
 
-	cfs_daemonize("kgnilnd_rr");
 	cfs_block_allsigs();
 	set_user_nice(current, *kgnilnd_tunables.kgn_nice);
 	kgnilnd_data.kgn_ruhroh_running = 1;

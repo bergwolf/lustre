@@ -2605,7 +2605,6 @@ static int mdd_lfsck_main(void *args)
 	int			 rc;
 	ENTRY;
 
-	cfs_daemonize("lfsck");
 	rc = lu_env_init(&env, LCT_MD_THREAD | LCT_DT_THREAD);
 	if (rc != 0) {
 		CERROR("%s: LFSCK, fail to init env, rc = %d\n",
@@ -2869,8 +2868,8 @@ trigger:
 
 	lfsck->ml_args_oit = (flags << DT_OTABLE_IT_FLAGS_SHIFT) | valid;
 	thread_set_flags(thread, 0);
-	rc = cfs_create_thread(mdd_lfsck_main, lfsck, 0);
-	if (rc < 0)
+	rc = PTR_ERR(cfs_kthread_run(mdd_lfsck_main, lfsck, "lfsck"));
+	if (IS_ERR_VALUE(rc))
 		CERROR("%s: cannot start LFSCK thread, rc = %d\n",
 		       mdd_lfsck2name(lfsck), rc);
 	else
