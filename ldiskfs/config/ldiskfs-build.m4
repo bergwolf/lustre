@@ -1,11 +1,11 @@
 AC_DEFUN([LDISKFS_AC_LINUX_VERSION], [
 	AC_MSG_CHECKING([kernel source version])
 
-	utsrelease1=${LINUX_OBJ}/include/linux/version.h
+	utsrelease1=${LINUX_OBJ}/include/$LINUXVERSION_HDIR/version.h
 	utsrelease2=${LINUX_OBJ}/include/linux/utsrelease.h
 	utsrelease3=${LINUX_OBJ}/include/generated/utsrelease.h
 	AS_IF([test -r ${utsrelease1} && fgrep -q UTS_RELEASE ${utsrelease1}], [
-		utsrelease=linux/version.h
+		utsrelease=$LINUXVERSION_HDIR/version.h
 	], [test -r ${utsrelease2} && fgrep -q UTS_RELEASE ${utsrelease2}], [
 		utsrelease=linux/utsrelease.h
 	], [test -r ${utsrelease3} && fgrep -q UTS_RELEASE ${utsrelease3}], [
@@ -64,7 +64,7 @@ AC_SUBST(RELEASE)
 # check is redhat/suse kernels
 AC_MSG_CHECKING([that RedHat kernel])
 LB_LINUX_TRY_COMPILE([
-		#include <linux/version.h>
+		#include <$LINUXVERSION_HDIR/version.h>
 	],[
 		#ifndef RHEL_RELEASE_CODE
 		#error "not redhat kernel"
@@ -190,8 +190,10 @@ LB_CHECK_FILE([$LINUX_OBJ/include/generated/autoconf.h],[AUTOCONF_HDIR=generated
         [LB_CHECK_FILE([$LINUX_OBJ/include/linux/autoconf.h],[AUTOCONF_HDIR=linux],
 	[AC_MSG_ERROR([Run make config in $LINUX.])])])
         AC_SUBST(AUTOCONF_HDIR)
-LB_CHECK_FILE([$LINUX_OBJ/include/linux/version.h],[],
-	[AC_MSG_ERROR([Run make config in $LINUX.])])
+LB_CHECK_FILE([$LINUX_OBJ/include/generated/uapi/linux/version.h],[LINUXVERSION_HDIR=generated/uapi/linux],
+        [LB_CHECK_FILE([$LINUX_OBJ/include/linux/version.h],[LINUXVERSION_HDIR=linux],
+	[AC_MSG_ERROR([Run make config in $LINUX.])])])
+        AC_SUBST(LINUXVERSION_HDIR)
 
 # ----------- kconfig.h exists ---------------
 # kernel 3.1, $LINUX/include/linux/kconfig.h is added
@@ -208,7 +210,7 @@ LB_CHECK_FILE([$LINUX_OBJ/include/linux/kconfig.h],
 # tarred up the tree and ran make dep etc. in it, then
 # version.h gets overwritten with a standard linux one.
 
-if grep rhconfig $LINUX_OBJ/include/linux/version.h >/dev/null ; then
+if grep rhconfig $LINUX_OBJ/include/$LINUXVERSION_HDIR/version.h >/dev/null ; then
 	# This is a clean kernel-source tree, we need to
 	# enable extensive workarounds to get this to build
 	# modules
