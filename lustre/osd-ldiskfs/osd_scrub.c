@@ -962,7 +962,6 @@ static int osd_scrub_main(void *args)
 	int		      rc;
 	ENTRY;
 
-	cfs_daemonize("OI_scrub");
 	rc = lu_env_init(&env, LCT_DT_THREAD);
 	if (rc != 0) {
 		CERROR("%.16s: OI scrub, fail to init env, rc = %d\n",
@@ -1541,8 +1540,8 @@ again:
 
 	scrub->os_start_flags = flags;
 	thread_set_flags(thread, 0);
-	rc = cfs_create_thread(osd_scrub_main, dev, 0);
-	if (rc < 0) {
+	rc = PTR_ERR(cfs_kthread_run(osd_scrub_main, dev, "OI_scrub"));
+	if (IS_ERR_VALUE(rc)) {
 		CERROR("%.16s: cannot start iteration thread, rc = %d\n",
 		       LDISKFS_SB(osd_sb(dev))->s_es->s_volume_name, rc);
 		RETURN(rc);
