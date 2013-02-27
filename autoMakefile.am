@@ -84,7 +84,7 @@ all-am: modules
 modules: $(DEP) all-sources
 	$(MAKE) CC="$(CC)" -C $(LINUX_OBJ)			     \
 	-f $(PWD)/build/Makefile LUSTRE_LINUX_CONFIG=$(LINUX_CONFIG) \
-        LINUXINCLUDE='$(EXTRA_LNET_INCLUDE) -I$$(srctree)/arch/$$(SRCARCH)/include -I$$(srctree)/arch/$$(SRCARCH)/include/generated -Iinclude $$(if $$(KBUILD_SRC),-Iinclude2 -I$$(srctree)/include) -include $(CONFIG_INCLUDE)' \
+        LINUXINCLUDE='$(EXTRA_LNET_INCLUDE) -I$$(srctree)/arch/$$(SRCARCH)/include -I$$(srctree)/arch/$$(SRCARCH)/include/generated -I$$(srctree)/arch/$$(SRCARCH)/include/generated/uapi -I$$(srctree)/arch/$$(SRCARCH)/include/uapi -Iinclude -Iinclude/uapi -Iinclude/generated -Iinclude/generated/uapi $$(if $$(KBUILD_SRC),-Iinclude2 -I$$(srctree)/include) -include $(CONFIG_INCLUDE)' \
 	$(MODULE_TARGET)=$(PWD) -o tmp_include_depends -o scripts -o \
 	include/config/MARKER $@
 endif # LINUX
