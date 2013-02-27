@@ -705,7 +705,7 @@ struct lookup_intent *ll_convert_intent(struct open_intent *oit,
                                         int lookup_flags);
 #endif
 struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de);
-int ll_rmdir_entry(struct inode *dir, char *name, int namelen);
+int ll_rmdir_entry(struct inode *dir, const char *name, int namelen);
 
 /* llite/rw.c */
 int ll_prepare_write(struct file *, struct page *, unsigned from, unsigned to);

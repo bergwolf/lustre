@@ -1142,7 +1142,7 @@ static int ll_rmdir_generic(struct inode *dir, struct dentry *dparent,
 /**
  * Remove dir entry
  **/
-int ll_rmdir_entry(struct inode *dir, char *name, int namelen)
+int ll_rmdir_entry(struct inode *dir, const char *name, int namelen)
 {
 	struct ptlrpc_request *request = NULL;
 	struct md_op_data *op_data;
