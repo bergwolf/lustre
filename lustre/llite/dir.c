@@ -1406,7 +1406,7 @@ free_lmv:
 		RETURN(rc);
 	}
 	case LL_IOC_REMOVE_ENTRY: {
-		char		*filename = NULL;
+		struct filename  *filename = NULL;
 		int		 namelen = 0;
 		int		 rc;
 
@@ -1418,18 +1418,18 @@ free_lmv:
 		if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_LVB_TYPE))
 			return -ENOTSUPP;
 
-		filename = getname((const char *)arg);
+		filename = ll_getname((const char *)arg);
 		if (IS_ERR(filename))
 			RETURN(PTR_ERR(filename));
 
-		namelen = strlen(filename);
+		namelen = strlen(filename->name);
 		if (namelen < 1)
 			GOTO(out_rmdir, rc = -EINVAL);
 
-		rc = ll_rmdir_entry(inode, filename, namelen);
+		rc = ll_rmdir_entry(inode, filename->name, namelen);
 out_rmdir:
-                if (filename)
-                        putname(filename);
+		if (filename)
+			ll_putname(filename);
 		RETURN(rc);
 	}
 	case LL_IOC_LOV_SWAP_LAYOUTS:
@@ -1440,21 +1440,21 @@ out_rmdir:
         case LL_IOC_MDC_GETINFO:
         case IOC_MDC_GETFILEINFO:
         case IOC_MDC_GETFILESTRIPE: {
-                struct ptlrpc_request *request = NULL;
-                struct lov_user_md *lump;
-                struct lov_mds_md *lmm = NULL;
-                struct mdt_body *body;
-                char *filename = NULL;
-                int lmmsize;
+		struct ptlrpc_request *request = NULL;
+		struct lov_user_md *lump;
+		struct lov_mds_md *lmm = NULL;
+		struct mdt_body *body;
+		struct filename *filename = NULL;
+		int lmmsize;
 
-                if (cmd == IOC_MDC_GETFILEINFO ||
-                    cmd == IOC_MDC_GETFILESTRIPE) {
-                        filename = getname((const char *)arg);
-                        if (IS_ERR(filename))
-                                RETURN(PTR_ERR(filename));
+		if (cmd == IOC_MDC_GETFILEINFO ||
+		    cmd == IOC_MDC_GETFILESTRIPE) {
+			filename = ll_getname((const char *)arg);
+			if (IS_ERR(filename))
+				RETURN(PTR_ERR(filename));
 
-                        rc = ll_lov_getstripe_ea_info(inode, filename, &lmm,
-                                                      &lmmsize, &request);
+			rc = ll_lov_getstripe_ea_info(inode, filename->name,
+						      &lmm, &lmmsize, &request);
                 } else {
                         rc = ll_dir_getstripe(inode, &lmm, &lmmsize, &request);
                 }
@@ -1514,10 +1514,10 @@ out_rmdir:
 
                 EXIT;
         out_req:
-                ptlrpc_req_finished(request);
-                if (filename)
-                        putname(filename);
-                return rc;
+		ptlrpc_req_finished(request);
+		if (filename)
+			ll_putname(filename);
+		return rc;
         }
         case IOC_LOV_GETINFO: {
                 struct lov_user_mds_data *lumd;
