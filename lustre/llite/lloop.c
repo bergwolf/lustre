@@ -420,8 +420,6 @@ static int loop_thread(void *data)
         int refcheck;
         int ret = 0;
 
-        daemonize("lloop%d", lo->lo_number);
-
         set_user_nice(current, -20);
 
         lo->lo_state = LLOOP_BOUND;
@@ -554,7 +552,7 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
 
         set_blocksize(bdev, lo->lo_blocksize);
 
-        cfs_create_thread(loop_thread, lo, CLONE_KERNEL);
+	 cfs_kthread_run(loop_thread, lo, "lloop%d", lo->lo_number);
 	down(&lo->lo_sem);
         return 0;
 

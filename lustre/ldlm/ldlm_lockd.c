@@ -178,7 +178,6 @@ static int expired_lock_main(void *arg)
         int do_dump;
 
         ENTRY;
-        cfs_daemonize("ldlm_elt");
 
         expired_lock_thread.elt_state = ELT_READY;
         cfs_waitq_signal(&expired_lock_thread.elt_waitq);
@@ -2548,14 +2547,17 @@ static int ldlm_bl_thread_main(void *arg);
 static int ldlm_bl_thread_start(struct ldlm_bl_pool *blp)
 {
 	struct ldlm_bl_thread_data bltd = { .bltd_blp = blp };
-	int rc;
+	cfs_task_t *task;
 
 	init_completion(&bltd.bltd_comp);
-	rc = cfs_create_thread(ldlm_bl_thread_main, &bltd, 0);
-	if (rc < 0) {
-		CERROR("cannot start LDLM thread ldlm_bl_%02d: rc %d\n",
-		       cfs_atomic_read(&blp->blp_num_threads), rc);
-		return rc;
+	bltd.bltd_num = cfs_atomic_read(&blp->blp_num_threads);
+	snprintf(bltd.bltd_name, sizeof(bltd.bltd_name) - 1,
+		"ldlm_bl_%02d", bltd.bltd_num);
+	task = cfs_kthread_run(ldlm_bl_thread_main, &bltd, bltd.bltd_name);
+	if (IS_ERR(task)) {
+		CERROR("cannot start LDLM thread ldlm_bl_%02d: rc %ld\n",
+		       cfs_atomic_read(&blp->blp_num_threads), PTR_ERR(task));
+		return PTR_ERR(task);
 	}
 	wait_for_completion(&bltd.bltd_comp);
 
@@ -2579,13 +2581,8 @@ static int ldlm_bl_thread_main(void *arg)
 
                 blp = bltd->bltd_blp;
 
-                bltd->bltd_num =
-                        cfs_atomic_inc_return(&blp->blp_num_threads) - 1;
+		cfs_atomic_inc(&blp->blp_num_threads);
                 cfs_atomic_inc(&blp->blp_busy_threads);
-
-                snprintf(bltd->bltd_name, sizeof(bltd->bltd_name) - 1,
-                        "ldlm_bl_%02d", bltd->bltd_num);
-                cfs_daemonize(bltd->bltd_name);
 
 		complete(&bltd->bltd_comp);
                 /* cannot use bltd after this, it is only on caller's stack */
@@ -2933,7 +2930,7 @@ static int ldlm_setup(void)
 	spin_lock_init(&waiting_locks_spinlock);
         cfs_timer_init(&waiting_locks_timer, waiting_locks_callback, 0);
 
-        rc = cfs_create_thread(expired_lock_main, NULL, CFS_DAEMON_FLAGS);
+	rc = PTR_ERR(cfs_kthread_run(expired_lock_main, NULL, "ldlm_elt"));
 	if (rc < 0) {
 		CERROR("Cannot start ldlm expired-lock thread: %d\n", rc);
 		GOTO(out, rc);

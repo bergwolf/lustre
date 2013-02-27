@@ -647,7 +647,7 @@ int llog_cat_process_thread(void *data)
         int rc;
         ENTRY;
 
-        cfs_daemonize_ctxt("ll_log_process");
+	cfs_unshare_fs_struct();
 
 	rc = lu_env_init(&env, LCT_LOCAL);
 	if (rc)

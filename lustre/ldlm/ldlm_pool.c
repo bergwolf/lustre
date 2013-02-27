@@ -1295,15 +1295,13 @@ EXPORT_SYMBOL(ldlm_pools_recalc);
 static int ldlm_pools_thread_main(void *arg)
 {
         struct ptlrpc_thread *thread = (struct ptlrpc_thread *)arg;
-        char *t_name = "ldlm_poold";
         ENTRY;
 
-        cfs_daemonize(t_name);
         thread_set_flags(thread, SVC_RUNNING);
         cfs_waitq_signal(&thread->t_ctl_waitq);
 
         CDEBUG(D_DLMTRACE, "%s: pool thread starting, process %d\n",
-               t_name, cfs_curproc_pid());
+		"ldlm_poold", cfs_curproc_pid());
 
         while (1) {
                 struct l_wait_info lwi;
@@ -1335,7 +1333,7 @@ static int ldlm_pools_thread_main(void *arg)
         cfs_waitq_signal(&thread->t_ctl_waitq);
 
         CDEBUG(D_DLMTRACE, "%s: pool thread exiting, process %d\n",
-               t_name, cfs_curproc_pid());
+		"ldlm_poold", cfs_curproc_pid());
 
 	complete_and_exit(&ldlm_pools_comp, 0);
 }
@@ -1343,7 +1341,7 @@ static int ldlm_pools_thread_main(void *arg)
 static int ldlm_pools_thread_start(void)
 {
         struct l_wait_info lwi = { 0 };
-        int rc;
+	cfs_task_t *task;
         ENTRY;
 
         if (ldlm_pools_thread != NULL)
@@ -1356,19 +1354,14 @@ static int ldlm_pools_thread_start(void)
 	init_completion(&ldlm_pools_comp);
         cfs_waitq_init(&ldlm_pools_thread->t_ctl_waitq);
 
-        /*
-         * CLONE_VM and CLONE_FILES just avoid a needless copy, because we
-         * just drop the VM and FILES in cfs_daemonize() right away.
-         */
-        rc = cfs_create_thread(ldlm_pools_thread_main, ldlm_pools_thread,
-                               CFS_DAEMON_FLAGS);
-        if (rc < 0) {
-                CERROR("Can't start pool thread, error %d\n",
-                       rc);
-                OBD_FREE(ldlm_pools_thread, sizeof(*ldlm_pools_thread));
-                ldlm_pools_thread = NULL;
-                RETURN(rc);
-        }
+	task = cfs_kthread_run(ldlm_pools_thread_main, ldlm_pools_thread,
+				"ldlm_poold");
+	if (IS_ERR(task)) {
+		CERROR("Can't start pool thread, error %ld\n", PTR_ERR(task));
+		OBD_FREE(ldlm_pools_thread, sizeof(*ldlm_pools_thread));
+		ldlm_pools_thread = NULL;
+		RETURN(PTR_ERR(task));
+	}
         l_wait_event(ldlm_pools_thread->t_ctl_waitq,
                      thread_is_running(ldlm_pools_thread), &lwi);
         RETURN(0);
