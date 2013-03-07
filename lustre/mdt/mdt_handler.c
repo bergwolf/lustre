@@ -5500,7 +5500,7 @@ static int mdt_fid2path(const struct lu_env *env, struct mdt_device *mdt,
 {
 	struct mdt_object *obj;
 	struct obd_device *obd = mdt2obd_dev(mdt);
-	int    rc;
+	int    rc = 0;
 	ENTRY;
 
 	CDEBUG(D_IOCTL, "path get "DFID" from "LPU64" #%d\n",
