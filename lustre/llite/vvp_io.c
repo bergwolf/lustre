@@ -362,9 +362,17 @@ static int vvp_do_vmtruncate(struct inode *inode, size_t size)
 	 * Only ll_inode_size_lock is taken at this level.
 	 */
 	ll_inode_size_lock(inode);
+#ifdef HAVE_MM_VMTRUNCATE
 	result = vmtruncate(inode, size);
+#else
+	result = inode_newsize_ok(inode, size);
+	if (result < 0) {
+		ll_inode_size_unlock(inode);
+		return result;
+	}
+	truncate_setsize(inode, size);
+#endif
 	ll_inode_size_unlock(inode);
-
 	return result;
 }
 

@@ -2252,6 +2252,26 @@ LB_LINUX_TRY_COMPILE([
 ])
 
 #
+# 3.8 removes vmtruncate()
+# see upstream commit b9f61c3
+#
+AC_DEFUN([LC_HAVE_MM_VMTRUNCATE],
+[AC_MSG_CHECKING([if mm has vmtruncate])
+LB_LINUX_TRY_COMPILE([
+	#include <linux/mm.h>
+],[
+	vmtruncate(NULL, 0);
+],[
+	AC_DEFINE(HAVE_MM_VMTRUNCATE, 1,
+		[vmtruncate is defined by the kernel])
+	AC_MSG_RESULT([yes])
+],[
+	AC_MSG_RESULT([no])
+])
+])
+
+
+#
 # LC_PROG_LINUX
 #
 # Lustre linux kernel checks
@@ -2435,6 +2455,10 @@ AC_DEFUN([LC_PROG_LINUX],
 
 	 # 3.7
  	 LC_HAVE_POSIXACL_USER_NS
+
+	 # 3.8
+	 LC_HAVE_MM_VMTRUNCATE
+
 	 #
 	 if test x$enable_server = xyes ; then
 		AC_DEFINE(HAVE_SERVER_SUPPORT, 1, [support server])
