@@ -2609,7 +2609,6 @@ kgnilnd_reaper(void *arg)
 	struct timer_list  timer;
 	DEFINE_WAIT(wait);
 
-	cfs_daemonize("kgnilnd_rpr");
 	cfs_block_allsigs();
 
 	/* all gnilnd threads need to run fairly urgently */
@@ -4247,14 +4246,11 @@ kgnilnd_scheduler(void *arg)
 {
 	int               threadno = (long)arg;
 	kgn_device_t     *dev;
-	char              name[16];
 	int               busy_loops = 0;
 	DEFINE_WAIT(wait);
 
 	dev = &kgnilnd_data.kgn_devices[(threadno + 1) % kgnilnd_data.kgn_ndevs];
 
-	snprintf(name, sizeof(name), "kgnilnd_sd_%02d", threadno);
-	cfs_daemonize(name);
 	cfs_block_allsigs();
 
 	/* all gnilnd threads need to run fairly urgently */
