@@ -410,13 +410,15 @@ jt_ptl_which_nid (int argc, char **argv)
                         return -1;
                 }
 
-                if (best_nid == LNET_NID_ANY ||
-                    dist < best_dist ||
-                    (dist == best_dist && order < best_order)) {
-                        best_dist = dist;
-                        best_order = order;
-                        best_nid = nid;
-                }
+		/* See comments in ptlrpc_uuid_to_peer(). */
+		if (best_nid == LNET_NID_ANY ||
+		    dist < best_dist ||
+		    (dist == best_dist &&
+		     (order < best_order || data.ioc_nid % argc == 0))) {
+			best_dist = dist;
+			best_order = order;
+			best_nid = nid;
+		}
         }
 
         if (best_nid == LNET_NID_ANY) {

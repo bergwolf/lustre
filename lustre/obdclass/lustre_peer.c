@@ -85,7 +85,7 @@ int lustre_uuid_to_peer(const char *uuid, lnet_nid_t *peer_nid, int index)
 			if (index >= data->un_nid_count)
 				break;
 
-			rc = 0;
+			rc = data->un_nid_count;
 			*peer_nid = data->un_nids[index];
 			break;
 		}

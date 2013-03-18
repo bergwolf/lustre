@@ -2395,8 +2395,7 @@ EXPORT_SYMBOL(LNetGet);
  * \param dstnid Target NID.
  * \param srcnidp If not NULL, NID of the local interface to reach \a dstnid
  * is saved here.
- * \param orderp If not NULL, order of the route to reach \a dstnid is saved
- * here.
+ * \param orderp If not NULL, return 0 for 0@lo, 1 for local NID, 2 for others.
  *
  * \retval 0 If \a dstnid belongs to a local interface, and reserved option
  * local_nid_dist_zero is set, which is the default.
@@ -2412,7 +2411,6 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
 	__u32			dstnet = LNET_NIDNET(dstnid);
 	int			hops;
 	int			cpt;
-	__u32			order = 2;
 	cfs_list_t		*rn_list;
 
         /* if !local_nid_dist_zero, I don't return a distance of 0 ever
@@ -2446,12 +2444,10 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
                         if (srcnidp != NULL)
                                 *srcnidp = ni->ni_nid;
                         if (orderp != NULL)
-                                *orderp = order;
+                                *orderp = 2;
 			lnet_net_unlock(cpt);
 			return 1;
 		}
-
-		order++;
 	}
 
 	rn_list = lnet_net2rnethash(dstnet);
@@ -2476,11 +2472,10 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
                         if (srcnidp != NULL)
                                 *srcnidp = shortest->lr_gateway->lp_ni->ni_nid;
                         if (orderp != NULL)
-                                *orderp = order;
+                                *orderp = 2;
 			lnet_net_unlock(cpt);
 			return hops + 1;
 		}
-		order++;
 	}
 
 	lnet_net_unlock(cpt);

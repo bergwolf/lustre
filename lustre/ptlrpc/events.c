@@ -503,7 +503,7 @@ int ptlrpc_uuid_to_peer (struct obd_uuid *uuid,
 {
         int               best_dist = 0;
         __u32             best_order = 0;
-        int               count = 0;
+        int               index = 0, count;
         int               rc = -ENOENT;
         int               portals_compatibility;
         int               dist;
@@ -516,7 +516,7 @@ int ptlrpc_uuid_to_peer (struct obd_uuid *uuid,
         peer->pid = LUSTRE_SRV_LNET_PID;
 
         /* Choose the matching UUID that's closest */
-        while (lustre_uuid_to_peer(uuid->uuid, &dst_nid, count++) == 0) {
+        while ((count = lustre_uuid_to_peer(uuid->uuid, &dst_nid, index++)) > 0) {
                 dist = LNetDist(dst_nid, &src_nid, &order);
                 if (dist < 0)
                         continue;
@@ -527,11 +527,19 @@ int ptlrpc_uuid_to_peer (struct obd_uuid *uuid,
                         break;
                 }
 
-                if (rc < 0 ||
-                    dist < best_dist ||
-                    (dist == best_dist && order < best_order)) {
-                        best_dist = dist;
-                        best_order = order;
+		/*
+		 * A super simple hash to select dst_nid based on src_nid.
+		 * If multiple best_dist peers are found, it is better to load
+		 * balance between them across different clients.
+		 *
+		 * order is only used to select between 0@lo and local NID.
+		 */
+		if (rc < 0 ||
+		    dist < best_dist ||
+		    (dist == best_dist &&
+		     (order < best_order || src_nid % count == 0))) {
+			best_dist = dist;
+			best_order = order;
 
                         if (portals_compatibility > 1) {
                                 /* Strong portals compatibility: Zero the nid's
