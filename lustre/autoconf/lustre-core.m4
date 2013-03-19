@@ -2281,6 +2281,7 @@ AC_DEFUN([LC_PROG_LINUX],
          LC_CONFIG_RMTCLIENT
          LC_CONFIG_GSS
          LC_TASK_CLENV_STORE
+	 LC_CONFIG_LUSTRE_FSCACHE
 
          # 2.6.12
          LC_RW_TREE_LOCK
@@ -2469,6 +2470,25 @@ AC_ARG_ENABLE([client],
 			[disable Lustre client support]),
 	[],[enable_client='yes'])
 AC_MSG_RESULT([$enable_client])])
+
+#
+# LC_CONFIG_LUSTRE_FSCACHE
+# Build client side fscache support
+#
+AC_DEFUN([LC_CONFIG_LUSTRE_FSCACHE],
+[AC_MSG_CHECKING([whether to build Lustre client side fscache support])
+AC_ARG_ENABLE([fscache],
+	AC_HELP_STRING([--enable-fscache],
+			[enable Lustre client side fscache support]),
+	[enable_fscache='yes'],[])
+AC_MSG_RESULT([$enable_fscache])
+
+if test x$enable_fscache == xyes; then
+        LB_LINUX_CONFIG_IM([FSCACHE],[],
+                           [AC_MSG_ERROR([Lustre fscache requires that CONFIG_FSCACHE be enabled in your kernel.])])
+	AC_DEFINE(CONFIG_LUSTRE_FSCACHE, 1, [support fscache])
+fi
+])
 
 #
 # LC_CONFIG_LIBLUSTRE
@@ -2887,6 +2907,7 @@ AM_CONDITIONAL(GSS_KEYRING, test x$enable_gss_keyring = xyes)
 AM_CONDITIONAL(GSS_PIPEFS, test x$enable_gss_pipefs = xyes)
 AM_CONDITIONAL(LIBPTHREAD, test x$enable_libpthread = xyes)
 AM_CONDITIONAL(LLITE_LLOOP, test x$enable_llite_lloop_module = xyes)
+AM_CONDITIONAL(LLITE_FSCACHE, test x$enable_fscache = xyes)
 ])
 
 #

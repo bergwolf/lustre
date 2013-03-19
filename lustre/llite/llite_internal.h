@@ -278,6 +278,9 @@ struct ll_inode_info {
 	struct mutex			lli_layout_mutex;
 	/* valid only inside LAYOUT ibits lock, protected by lli_layout_mutex */
 	__u32				lli_layout_gen;
+#ifdef CONFIG_LUSTRE_FSCACHE
+	struct fscache_cookie		*lli_fscache;
+#endif
 };
 
 /*
@@ -401,6 +404,7 @@ enum stats_track_type {
 #define LL_SBI_VERBOSE        0x10000 /* verbose mount/umount */
 #define LL_SBI_LAYOUT_LOCK    0x20000 /* layout lock support */
 #define LL_SBI_USER_FID2PATH  0x40000 /* allow fid2path by unprivileged users */
+#define LL_SBI_ENABLE_FSCACHE 0x80000 /* enable fscache support */
 
 #define LL_SBI_FLAGS { 	\
 	"nolck",	\
@@ -420,7 +424,8 @@ enum stats_track_type {
 	"agl",		\
 	"verbose",	\
 	"layout",	\
-	"user_fid2path" }
+	"user_fid2path" \
+	"fsc"		}
 
 /* default value for ll_sb_info->contention_time */
 #define SBI_DEFAULT_CONTENTION_SECONDS     60
@@ -483,6 +488,9 @@ struct ll_sb_info {
         struct ll_ra_info         ll_ra_info;
         unsigned int              ll_namelen;
         struct file_operations   *ll_fop;
+#ifdef CONFIG_LUSTRE_FSCACHE
+	struct fscache_cookie	  *ll_fscache;
+#endif
 
         /* =0 - hold lock over whole read/write
          * >0 - max. chunk to be read/written w/o lock re-acquiring */

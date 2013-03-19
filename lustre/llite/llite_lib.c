@@ -55,6 +55,7 @@
 #include <cl_object.h>
 #include <obd_cksum.h>
 #include "llite_internal.h"
+#include "fscache.h"
 
 cfs_mem_cache_t *ll_file_data_slab;
 
@@ -145,6 +146,8 @@ static struct ll_sb_info *ll_init_sbi(void)
         cfs_atomic_set(&sbi->ll_agl_total, 0);
         sbi->ll_flags |= LL_SBI_AGL_ENABLED;
 
+	ll_fscache_get_super_cookie(sbi);
+
         RETURN(sbi);
 }
 
@@ -157,6 +160,7 @@ void ll_free_sbi(struct super_block *sb)
 		spin_lock(&ll_sb_lock);
 		cfs_list_del(&sbi->ll_list);
 		spin_unlock(&ll_sb_lock);
+		ll_fscache_release_super_cookie(sbi);
 		OBD_FREE(sbi, sizeof(*sbi));
 	}
 	EXIT;
@@ -790,6 +794,11 @@ static int ll_options(char *options, int *flags)
                         *flags &= ~tmp;
                         goto next;
                 }
+		tmp = ll_set_opt("fsc", s1, LL_SBI_ENABLE_FSCACHE);
+		if (tmp) {
+			*flags |= tmp;
+			goto next;
+		}
 #if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(2, 5, 50, 0)
                 tmp = ll_set_opt("acl", s1, LL_SBI_ACL);
                 if (tmp) {
@@ -918,6 +927,9 @@ void ll_lli_init(struct ll_inode_info *lli)
 	lli->lli_has_smd = false;
 	lli->lli_layout_gen = LL_LAYOUT_GEN_NONE;
 	lli->lli_clob = NULL;
+#ifdef CONFIG_LUSTRE_FSCACHE
+	lli->lli_fscache = NULL;
+#endif
 
 	LASSERT(lli->lli_vfs_inode.i_mode != 0);
 	if (S_ISDIR(lli->lli_vfs_inode.i_mode)) {
@@ -1234,6 +1246,7 @@ void ll_clear_inode(struct inode *inode)
          */
         cl_inode_fini(inode);
 	lli->lli_has_smd = false;
+	ll_fscache_release_inode_cookie(inode);
 
 	EXIT;
 }
@@ -2391,6 +2404,8 @@ int ll_show_options(struct seq_file *seq, struct vfsmount *vfs)
 
 	if (sbi->ll_flags & LL_SBI_USER_FID2PATH)
 		seq_puts(seq, ",user_fid2path");
+	if (sbi->ll_flags & LL_SBI_ENABLE_FSCACHE)
+		seq_puts(seq, ",fsc");
 
         RETURN(0);
 }

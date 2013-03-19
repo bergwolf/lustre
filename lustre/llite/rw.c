@@ -61,6 +61,7 @@
 #include <obd_cksum.h>
 #include "llite_internal.h"
 #include <linux/lustre_compat25.h>
+#include "fscache.h"
 
 /**
  * Finalizes cl-data before exiting typical address_space operation. Dual to
@@ -1287,6 +1288,10 @@ int ll_readpage(struct file *file, struct page *vmpage)
         int result;
         ENTRY;
 
+	result = ll_fscache_readpage(file->f_path.dentry->d_inode, vmpage);
+	if (result == 0)
+		GOTO(read_done, 0);
+
         lcc = ll_cl_init(file, vmpage, 0);
         if (!IS_ERR(lcc)) {
                 struct lu_env  *env  = lcc->lcc_env;
@@ -1308,6 +1313,7 @@ int ll_readpage(struct file *file, struct page *vmpage)
                 unlock_page(vmpage);
                 result = PTR_ERR(lcc);
         }
+read_done:
         RETURN(result);
 }
 

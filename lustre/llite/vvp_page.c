@@ -49,6 +49,7 @@
 #include <lustre_lite.h>
 
 #include "vvp_internal.h"
+#include "fscache.h"
 
 /*****************************************************************************
  *
@@ -273,28 +274,30 @@ static void vvp_page_completion_read(const struct lu_env *env,
                                      const struct cl_page_slice *slice,
                                      int ioret)
 {
-        struct ccc_page *cp     = cl2ccc_page(slice);
-        cfs_page_t      *vmpage = cp->cpg_page;
-        struct cl_page  *page   = cl_page_top(slice->cpl_page);
-        struct inode    *inode  = ccc_object_inode(page->cp_obj);
-        ENTRY;
+	struct ccc_page *cp     = cl2ccc_page(slice);
+	cfs_page_t      *vmpage = cp->cpg_page;
+	struct cl_page  *page   = cl_page_top(slice->cpl_page);
+	struct inode    *inode  = ccc_object_inode(page->cp_obj);
+	ENTRY;
 
-        LASSERT(PageLocked(vmpage));
-        CL_PAGE_HEADER(D_PAGE, env, page, "completing READ with %d\n", ioret);
+	LASSERT(PageLocked(vmpage));
+	CL_PAGE_HEADER(D_PAGE, env, page, "completing READ with %d\n", ioret);
 
-        if (cp->cpg_defer_uptodate)
-                ll_ra_count_put(ll_i2sbi(inode), 1);
+	if (cp->cpg_defer_uptodate)
+		ll_ra_count_put(ll_i2sbi(inode), 1);
 
-        if (ioret == 0)  {
-                if (!cp->cpg_defer_uptodate)
-                        cl_page_export(env, page, 1);
-        } else
-                cp->cpg_defer_uptodate = 0;
+	if (ioret == 0)  {
+		if (!cp->cpg_defer_uptodate)
+			cl_page_export(env, page, 1);
+		/* XXX: should really do this in a workqueue... */
+		ll_fscache_add_page(inode, vmpage);
+	} else
+		cp->cpg_defer_uptodate = 0;
 
-        if (page->cp_sync_io == NULL)
-                unlock_page(vmpage);
+	if (page->cp_sync_io == NULL)
+		unlock_page(vmpage);
 
-        EXIT;
+	EXIT;
 }
 
 static void vvp_page_completion_write(const struct lu_env *env,

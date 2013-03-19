@@ -46,6 +46,7 @@
 #include <linux/fs.h>
 #include <lprocfs_status.h>
 #include "llite_internal.h"
+#include "fscache.h"
 
 static cfs_mem_cache_t *ll_inode_cachep;
 
@@ -123,39 +124,48 @@ static int __init init_lustre_lite(void)
 	CDEBUG(D_INFO, "Lustre client module (%p).\n",
 	       &lustre_super_operations);
 
-        rc = ll_init_inodecache();
-        if (rc)
-                return -ENOMEM;
+	rc = ll_fscache_register();
+	if (rc)
+		return rc;
+
+	rc = ll_init_inodecache();
+	if (rc) {
+		ll_fscache_unregister();
+		return -ENOMEM;
+	}
         ll_file_data_slab = cfs_mem_cache_create("ll_file_data",
                                                  sizeof(struct ll_file_data), 0,
                                                  CFS_SLAB_HWCACHE_ALIGN);
-        if (ll_file_data_slab == NULL) {
-                ll_destroy_inodecache();
-                return -ENOMEM;
-        }
+	if (ll_file_data_slab == NULL) {
+		ll_destroy_inodecache();
+		ll_fscache_unregister();
+		return -ENOMEM;
+	}
 
         ll_remote_perm_cachep = cfs_mem_cache_create("ll_remote_perm_cache",
                                                   sizeof(struct ll_remote_perm),
                                                       0, 0);
-        if (ll_remote_perm_cachep == NULL) {
-                cfs_mem_cache_destroy(ll_file_data_slab);
-                ll_file_data_slab = NULL;
-                ll_destroy_inodecache();
-                return -ENOMEM;
-        }
+	if (ll_remote_perm_cachep == NULL) {
+		cfs_mem_cache_destroy(ll_file_data_slab);
+		ll_file_data_slab = NULL;
+		ll_destroy_inodecache();
+		ll_fscache_unregister();
+		return -ENOMEM;
+	}
 
         ll_rmtperm_hash_cachep = cfs_mem_cache_create("ll_rmtperm_hash_cache",
                                                    REMOTE_PERM_HASHSIZE *
                                                    sizeof(cfs_list_t),
                                                    0, 0);
-        if (ll_rmtperm_hash_cachep == NULL) {
-                cfs_mem_cache_destroy(ll_remote_perm_cachep);
-                ll_remote_perm_cachep = NULL;
-                cfs_mem_cache_destroy(ll_file_data_slab);
-                ll_file_data_slab = NULL;
-                ll_destroy_inodecache();
-                return -ENOMEM;
-        }
+	if (ll_rmtperm_hash_cachep == NULL) {
+		cfs_mem_cache_destroy(ll_remote_perm_cachep);
+		ll_remote_perm_cachep = NULL;
+		cfs_mem_cache_destroy(ll_file_data_slab);
+		ll_file_data_slab = NULL;
+		ll_destroy_inodecache();
+		ll_fscache_unregister();
+		return -ENOMEM;
+	}
 
         proc_lustre_fs_root = proc_lustre_root ?
                               lprocfs_register("llite", proc_lustre_root, NULL, NULL) : NULL;
@@ -223,6 +233,7 @@ static void __exit exit_lustre_lite(void)
         LASSERTF(rc == 0, "couldn't destroy ll_file_data slab\n");
         if (proc_lustre_fs_root)
                 lprocfs_remove(&proc_lustre_fs_root);
+	ll_fscache_unregister();
 }
 
 MODULE_AUTHOR("Sun Microsystems, Inc. <http://www.lustre.org/>");

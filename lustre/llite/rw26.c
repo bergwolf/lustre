@@ -65,6 +65,7 @@
 #include <lustre_lite.h>
 #include "llite_internal.h"
 #include <linux/lustre_compat25.h>
+#include "fscache.h"
 
 /**
  * Implements Linux VM address_space::invalidatepage() method. This method is
@@ -78,25 +79,25 @@
  */
 static void ll_invalidatepage(struct page *vmpage, unsigned long offset)
 {
-        struct inode     *inode;
-        struct lu_env    *env;
-        struct cl_page   *page;
-        struct cl_object *obj;
+	LASSERT(PageLocked(vmpage));
+	LASSERT(!PageWriteback(vmpage));
 
-        int refcheck;
+	/*
+	 * It is safe to not check anything in invalidatepage/releasepage
+	 * below because they are run with page locked and all our io is
+	 * happening with locked page too
+	 */
+	if (offset == 0) {
+		struct inode     *inode = vmpage->mapping->host;
+		struct lu_env    *env;
+		struct cl_page   *page;
+		struct cl_object *obj;
+		int refcheck;
 
-        LASSERT(PageLocked(vmpage));
-        LASSERT(!PageWriteback(vmpage));
+		ll_fscache_invalidate_page(inode, vmpage);
 
-        /*
-         * It is safe to not check anything in invalidatepage/releasepage
-         * below because they are run with page locked and all our io is
-         * happening with locked page too
-         */
-        if (offset == 0) {
                 env = cl_env_get(&refcheck);
                 if (!IS_ERR(env)) {
-                        inode = vmpage->mapping->host;
                         obj = ll_i2info(inode)->lli_clob;
                         if (obj != NULL) {
                                 page = cl_vmpage_page(vmpage, obj);
@@ -115,12 +116,7 @@ static void ll_invalidatepage(struct page *vmpage, unsigned long offset)
         }
 }
 
-#ifdef HAVE_RELEASEPAGE_WITH_INT
-#define RELEASEPAGE_ARG_TYPE int
-#else
-#define RELEASEPAGE_ARG_TYPE gfp_t
-#endif
-static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
+static int ll_releasepage(struct page *vmpage, gfp_t gfp_mask)
 {
         struct cl_env_nest nest;
         struct lu_env     *env;
@@ -144,6 +140,9 @@ static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
         /* 1 for page allocator, 1 for cl_page and 1 for page cache */
         if (page_count(vmpage) > 3)
                 return 0;
+
+	if (!ll_fscache_release_page(vmpage, gfp_mask))
+		return 0;
 
         /* TODO: determine what gfp should be used by @gfp_mask. */
         env = cl_env_nested_get(&nest);

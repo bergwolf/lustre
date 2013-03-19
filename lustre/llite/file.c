@@ -49,6 +49,7 @@
 #include <lustre/ll_fiemap.h>
 
 #include "cl_object.h"
+#include "fscache.h"
 
 struct ll_file_data *ll_file_data_get(void)
 {
@@ -661,8 +662,9 @@ restart:
                         GOTO(out_och_free, rc);
                 }
         }
-        file->f_flags &= ~O_LOV_DELAY_CREATE;
-        GOTO(out_och_free, rc);
+	file->f_flags &= ~O_LOV_DELAY_CREATE;
+	ll_fscache_set_inode_cookie(inode, file);
+	GOTO(out_och_free, rc);
 
 out_och_free:
         if (rc) {
