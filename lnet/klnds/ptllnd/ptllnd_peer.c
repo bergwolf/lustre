@@ -43,12 +43,12 @@
 #include <libcfs/list.h>
 
 static int
-kptllnd_count_queue(cfs_list_t *q)
+kptllnd_count_queue(struct list_head *q)
 {
-        cfs_list_t *e;
+        struct list_head *e;
         int         n = 0;
 
-        cfs_list_for_each(e, q) {
+        list_for_each(e, q) {
                 n++;
         }
 
@@ -66,7 +66,7 @@ kptllnd_get_peer_info(int index,
 {
 	rwlock_t     *g_lock = &kptllnd_data.kptl_peer_rw_lock;
         unsigned long     flags;
-        cfs_list_t       *ptmp;
+        struct list_head       *ptmp;
         kptl_peer_t      *peer;
         int               i;
         int               rc = -ENOENT;
@@ -74,8 +74,8 @@ kptllnd_get_peer_info(int index,
 	read_lock_irqsave(g_lock, flags);
 
         for (i = 0; i < kptllnd_data.kptl_peer_hash_size; i++) {
-                cfs_list_for_each (ptmp, &kptllnd_data.kptl_peers[i]) {
-                        peer = cfs_list_entry(ptmp, kptl_peer_t, peer_list);
+                list_for_each (ptmp, &kptllnd_data.kptl_peers[i]) {
+                        peer = list_entry(ptmp, kptl_peer_t, peer_list);
 
                         if (index-- > 0)
                                 continue;
@@ -122,7 +122,7 @@ kptllnd_peer_add_peertable_locked (kptl_peer_t *peer)
 
         /* NB add to HEAD of peer list for MRU order!
          * (see kptllnd_cull_peertable) */
-        cfs_list_add(&peer->peer_list, kptllnd_nid2peerlist(peer->peer_id.nid));
+        list_add(&peer->peer_list, kptllnd_nid2peerlist(peer->peer_id.nid));
 }
 
 void
@@ -131,18 +131,18 @@ kptllnd_cull_peertable_locked (lnet_process_id_t pid)
         /* I'm about to add a new peer with this portals ID to the peer table,
          * so (a) this peer should not exist already and (b) I want to leave at
          * most (max_procs_per_nid - 1) peers with this NID in the table. */
-        cfs_list_t   *peers = kptllnd_nid2peerlist(pid.nid);
+        struct list_head   *peers = kptllnd_nid2peerlist(pid.nid);
         int           cull_count = *kptllnd_tunables.kptl_max_procs_per_node;
         int           count;
-        cfs_list_t   *tmp;
-        cfs_list_t   *nxt;
+        struct list_head   *tmp;
+        struct list_head   *nxt;
         kptl_peer_t  *peer;
 
         count = 0;
-        cfs_list_for_each_safe (tmp, nxt, peers) {
+        list_for_each_safe (tmp, nxt, peers) {
                 /* NB I rely on kptllnd_peer_add_peertable_locked to add peers
                  * in MRU order */
-                peer = cfs_list_entry(tmp, kptl_peer_t, peer_list);
+                peer = list_entry(tmp, kptl_peer_t, peer_list);
                         
                 if (LNET_NIDADDR(peer->peer_id.nid) != LNET_NIDADDR(pid.nid))
                         continue;
@@ -178,9 +178,9 @@ kptllnd_peer_allocate (kptl_net_t *net, lnet_process_id_t lpid, ptl_process_id_t
 
         memset(peer, 0, sizeof(*peer));         /* zero flags etc */
 
-        CFS_INIT_LIST_HEAD (&peer->peer_noops);
-        CFS_INIT_LIST_HEAD (&peer->peer_sendq);
-        CFS_INIT_LIST_HEAD (&peer->peer_activeq);
+        INIT_LIST_HEAD (&peer->peer_noops);
+        INIT_LIST_HEAD (&peer->peer_sendq);
+        INIT_LIST_HEAD (&peer->peer_activeq);
 	spin_lock_init(&peer->peer_lock);
 
         peer->peer_state = PEER_STATE_ALLOCATED;
@@ -225,14 +225,14 @@ kptllnd_peer_destroy (kptl_peer_t *peer)
         LASSERT (cfs_atomic_read(&peer->peer_refcount) == 0);
         LASSERT (peer->peer_state == PEER_STATE_ALLOCATED ||
                  peer->peer_state == PEER_STATE_ZOMBIE);
-        LASSERT (cfs_list_empty(&peer->peer_noops));
-        LASSERT (cfs_list_empty(&peer->peer_sendq));
-        LASSERT (cfs_list_empty(&peer->peer_activeq));
+        LASSERT (list_empty(&peer->peer_noops));
+        LASSERT (list_empty(&peer->peer_sendq));
+        LASSERT (list_empty(&peer->peer_activeq));
 
 	write_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
 
         if (peer->peer_state == PEER_STATE_ZOMBIE)
-                cfs_list_del(&peer->peer_list);
+                list_del(&peer->peer_list);
 
         kptllnd_data.kptl_npeers--;
 
@@ -242,17 +242,17 @@ kptllnd_peer_destroy (kptl_peer_t *peer)
 }
 
 void
-kptllnd_cancel_txlist (cfs_list_t *peerq, cfs_list_t *txs)
+kptllnd_cancel_txlist (struct list_head *peerq, struct list_head *txs)
 {
-        cfs_list_t  *tmp;
-        cfs_list_t  *nxt;
+        struct list_head  *tmp;
+        struct list_head  *nxt;
         kptl_tx_t   *tx;
 
-        cfs_list_for_each_safe (tmp, nxt, peerq) {
-                tx = cfs_list_entry(tmp, kptl_tx_t, tx_list);
+        list_for_each_safe (tmp, nxt, peerq) {
+                tx = list_entry(tmp, kptl_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
-                cfs_list_add_tail(&tx->tx_list, txs);
+                list_del(&tx->tx_list);
+                list_add_tail(&tx->tx_list, txs);
 
                 tx->tx_status = -EIO;
                 tx->tx_active = 0;
@@ -260,7 +260,7 @@ kptllnd_cancel_txlist (cfs_list_t *peerq, cfs_list_t *txs)
 }
 
 void
-kptllnd_peer_cancel_txs(kptl_peer_t *peer, cfs_list_t *txs)
+kptllnd_peer_cancel_txs(kptl_peer_t *peer, struct list_head *txs)
 {
         unsigned long   flags;
 
@@ -306,7 +306,7 @@ kptllnd_peer_notify (kptl_peer_t *peer)
                 return;
 
 	read_lock(&kptllnd_data.kptl_net_rw_lock);
-        cfs_list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list)
+        list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list)
                 nnets++;
 	read_unlock(&kptllnd_data.kptl_net_rw_lock);
 
@@ -322,7 +322,7 @@ kptllnd_peer_notify (kptl_peer_t *peer)
 
 	read_lock(&kptllnd_data.kptl_net_rw_lock);
         i = 0;
-        cfs_list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list) {
+        list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list) {
                 LASSERT (i < nnets);
                 nets[i] = net;
                 kptllnd_net_addref(net);
@@ -353,32 +353,32 @@ void
 kptllnd_handle_closing_peers ()
 {
         unsigned long           flags;
-        cfs_list_t              txs;
+        struct list_head              txs;
         kptl_peer_t            *peer;
-        cfs_list_t             *tmp;
-        cfs_list_t             *nxt;
+        struct list_head             *tmp;
+        struct list_head             *nxt;
         kptl_tx_t              *tx;
         int                     idle;
 
         /* Check with a read lock first to avoid blocking anyone */
 
 	read_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
-        idle = cfs_list_empty(&kptllnd_data.kptl_closing_peers) &&
-               cfs_list_empty(&kptllnd_data.kptl_zombie_peers);
+        idle = list_empty(&kptllnd_data.kptl_closing_peers) &&
+               list_empty(&kptllnd_data.kptl_zombie_peers);
 	read_unlock_irqrestore(&kptllnd_data.kptl_peer_rw_lock, flags);
 
         if (idle)
                 return;
 
-        CFS_INIT_LIST_HEAD(&txs);
+        INIT_LIST_HEAD(&txs);
 
 	write_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
 
         /* Cancel txs on all zombie peers.  NB anyone dropping the last peer
          * ref removes it from this list, so I musn't drop the lock while
          * scanning it. */
-        cfs_list_for_each (tmp, &kptllnd_data.kptl_zombie_peers) {
-                peer = cfs_list_entry (tmp, kptl_peer_t, peer_list);
+        list_for_each (tmp, &kptllnd_data.kptl_zombie_peers) {
+                peer = list_entry (tmp, kptl_peer_t, peer_list);
 
                 LASSERT (peer->peer_state == PEER_STATE_ZOMBIE);
 
@@ -389,13 +389,13 @@ kptllnd_handle_closing_peers ()
          * I'm the only one removing from this list, but peers can be added on
          * the end any time I drop the lock. */
 
-        cfs_list_for_each_safe (tmp, nxt, &kptllnd_data.kptl_closing_peers) {
-                peer = cfs_list_entry (tmp, kptl_peer_t, peer_list);
+        list_for_each_safe (tmp, nxt, &kptllnd_data.kptl_closing_peers) {
+                peer = list_entry (tmp, kptl_peer_t, peer_list);
 
                 LASSERT (peer->peer_state == PEER_STATE_CLOSING);
 
-                cfs_list_del(&peer->peer_list);
-                cfs_list_add_tail(&peer->peer_list,
+                list_del(&peer->peer_list);
+                list_add_tail(&peer->peer_list,
                                   &kptllnd_data.kptl_zombie_peers);
                 peer->peer_state = PEER_STATE_ZOMBIE;
 
@@ -414,9 +414,9 @@ kptllnd_handle_closing_peers ()
         /* Drop peer's ref on all cancelled txs.  This will get
          * kptllnd_tx_fini() to abort outstanding comms if necessary. */
 
-        cfs_list_for_each_safe (tmp, nxt, &txs) {
-                tx = cfs_list_entry(tmp, kptl_tx_t, tx_list);
-                cfs_list_del(&tx->tx_list);
+        list_for_each_safe (tmp, nxt, &txs) {
+                tx = list_entry(tmp, kptl_tx_t, tx_list);
+                list_del(&tx->tx_list);
                 kptllnd_tx_decref(tx);
         }
 }
@@ -439,14 +439,14 @@ kptllnd_peer_close_locked(kptl_peer_t *peer, int why)
                 kptllnd_data.kptl_n_active_peers--;
                 LASSERT (kptllnd_data.kptl_n_active_peers >= 0);
 
-                cfs_list_del(&peer->peer_list);
+                list_del(&peer->peer_list);
                 kptllnd_peer_unreserve_buffers();
 
                 peer->peer_error = why; /* stash 'why' only on first close */
                 peer->peer_state = PEER_STATE_CLOSING;
 
                 /* Schedule for immediate attention, taking peer table's ref */
-                cfs_list_add_tail(&peer->peer_list,
+                list_add_tail(&peer->peer_list,
                                  &kptllnd_data.kptl_closing_peers);
                 cfs_waitq_signal(&kptllnd_data.kptl_watchdog_waitq);
                 break;
@@ -470,8 +470,8 @@ kptllnd_peer_close(kptl_peer_t *peer, int why)
 int
 kptllnd_peer_del(lnet_process_id_t id)
 {
-        cfs_list_t        *ptmp;
-        cfs_list_t        *pnxt;
+        struct list_head        *ptmp;
+        struct list_head        *pnxt;
         kptl_peer_t       *peer;
         int                lo;
         int                hi;
@@ -484,7 +484,7 @@ kptllnd_peer_del(lnet_process_id_t id)
          * wildcard (LNET_NID_ANY) then look at all of the buckets
          */
         if (id.nid != LNET_NID_ANY) {
-                cfs_list_t *l = kptllnd_nid2peerlist(id.nid);
+                struct list_head *l = kptllnd_nid2peerlist(id.nid);
 
                 lo = hi =  l - kptllnd_data.kptl_peers;
         } else {
@@ -499,9 +499,9 @@ again:
 	read_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
 
         for (i = lo; i <= hi; i++) {
-                cfs_list_for_each_safe (ptmp, pnxt,
+                list_for_each_safe (ptmp, pnxt,
                                         &kptllnd_data.kptl_peers[i]) {
-                        peer = cfs_list_entry (ptmp, kptl_peer_t, peer_list);
+                        peer = list_entry (ptmp, kptl_peer_t, peer_list);
 
                         if (!(id.nid == LNET_NID_ANY || 
                               (LNET_NIDADDR(peer->peer_id.nid) == LNET_NIDADDR(id.nid) &&
@@ -540,11 +540,11 @@ kptllnd_queue_tx(kptl_peer_t *peer, kptl_tx_t *tx)
 
         /* Ensure HELLO is sent first */
         if (tx->tx_msg->ptlm_type == PTLLND_MSG_TYPE_NOOP)
-                cfs_list_add(&tx->tx_list, &peer->peer_noops);
+                list_add(&tx->tx_list, &peer->peer_noops);
         else if (tx->tx_msg->ptlm_type == PTLLND_MSG_TYPE_HELLO)
-                cfs_list_add(&tx->tx_list, &peer->peer_sendq);
+                list_add(&tx->tx_list, &peer->peer_sendq);
         else
-                cfs_list_add_tail(&tx->tx_list, &peer->peer_sendq);
+                list_add_tail(&tx->tx_list, &peer->peer_sendq);
 
 	spin_unlock_irqrestore(&peer->peer_lock, flags);
 }
@@ -609,24 +609,24 @@ kptllnd_post_tx(kptl_peer_t *peer, kptl_tx_t *tx, int nfrag)
 /* NB "restarts" comes from peer_sendq of a single peer */
 void
 kptllnd_restart_txs (kptl_net_t *net, lnet_process_id_t target,
-                     cfs_list_t *restarts)
+                     struct list_head *restarts)
 {
         kptl_tx_t   *tx;
         kptl_tx_t   *tmp;
         kptl_peer_t *peer;
 
-        LASSERT (!cfs_list_empty(restarts));
+        LASSERT (!list_empty(restarts));
 
         if (kptllnd_find_target(net, target, &peer) != 0)
                 peer = NULL;
 
-        cfs_list_for_each_entry_safe (tx, tmp, restarts, tx_list) {
+        list_for_each_entry_safe (tx, tmp, restarts, tx_list) {
                 LASSERT (tx->tx_peer != NULL);
                 LASSERT (tx->tx_type == TX_TYPE_GET_REQUEST ||
                          tx->tx_type == TX_TYPE_PUT_REQUEST ||
                          tx->tx_type == TX_TYPE_SMALL_MESSAGE);
 
-                cfs_list_del_init(&tx->tx_list);
+                list_del_init(&tx->tx_list);
 
                 if (peer == NULL ||
                     tx->tx_msg->ptlm_type == PTLLND_MSG_TYPE_HELLO) {
@@ -655,12 +655,12 @@ kptllnd_peer_send_noop (kptl_peer_t *peer)
 {
         if (!peer->peer_sent_hello ||
             peer->peer_credits == 0 ||
-            !cfs_list_empty(&peer->peer_noops) ||
+            !list_empty(&peer->peer_noops) ||
             peer->peer_outstanding_credits < PTLLND_CREDIT_HIGHWATER)
                 return 0;
 
         /* No tx to piggyback NOOP onto or no credit to send a tx */
-        return (cfs_list_empty(&peer->peer_sendq) || peer->peer_credits == 1);
+        return (list_empty(&peer->peer_sendq) || peer->peer_credits == 1);
 }
 
 void
@@ -697,12 +697,12 @@ kptllnd_peer_check_sends (kptl_peer_t *peer)
         }
 
         for (;;) {
-                if (!cfs_list_empty(&peer->peer_noops)) {
+                if (!list_empty(&peer->peer_noops)) {
                         LASSERT (peer->peer_sent_hello);
-                        tx = cfs_list_entry(peer->peer_noops.next,
+                        tx = list_entry(peer->peer_noops.next,
                                             kptl_tx_t, tx_list);
-                } else if (!cfs_list_empty(&peer->peer_sendq)) {
-                        tx = cfs_list_entry(peer->peer_sendq.next,
+                } else if (!list_empty(&peer->peer_sendq)) {
+                        tx = list_entry(peer->peer_sendq.next,
                                             kptl_tx_t, tx_list);
                 } else {
                         /* nothing to send right now */
@@ -724,7 +724,7 @@ kptllnd_peer_check_sends (kptl_peer_t *peer)
 
                 /* Ensure HELLO is sent first */
                 if (!peer->peer_sent_hello) {
-                        LASSERT (cfs_list_empty(&peer->peer_noops));
+                        LASSERT (list_empty(&peer->peer_noops));
                         if (msg_type != PTLLND_MSG_TYPE_HELLO)
                                 break;
                         peer->peer_sent_hello = 1;
@@ -754,7 +754,7 @@ kptllnd_peer_check_sends (kptl_peer_t *peer)
                         break;
                 }
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
 
                 /* Discard any NOOP I queued if I'm not at the high-water mark
                  * any more or more messages have been queued */
@@ -795,7 +795,7 @@ kptllnd_peer_check_sends (kptl_peer_t *peer)
                        kptllnd_msgtype2str(msg_type), tx, tx->tx_msg->ptlm_nob,
                        tx->tx_msg->ptlm_credits);
 
-                cfs_list_add_tail(&tx->tx_list, &peer->peer_activeq);
+                list_add_tail(&tx->tx_list, &peer->peer_activeq);
 
                 kptllnd_tx_addref(tx);          /* 1 ref for me... */
 
@@ -871,10 +871,10 @@ kptl_tx_t *
 kptllnd_find_timed_out_tx(kptl_peer_t *peer)
 {
         kptl_tx_t         *tx;
-        cfs_list_t        *ele;
+        struct list_head        *ele;
 
-        cfs_list_for_each(ele, &peer->peer_sendq) {
-                tx = cfs_list_entry(ele, kptl_tx_t, tx_list);
+        list_for_each(ele, &peer->peer_sendq) {
+                tx = list_entry(ele, kptl_tx_t, tx_list);
 
                 if (cfs_time_aftereq(jiffies, tx->tx_deadline)) {
                         kptllnd_tx_addref(tx);
@@ -882,8 +882,8 @@ kptllnd_find_timed_out_tx(kptl_peer_t *peer)
                 }
         }
 
-        cfs_list_for_each(ele, &peer->peer_activeq) {
-                tx = cfs_list_entry(ele, kptl_tx_t, tx_list);
+        list_for_each(ele, &peer->peer_activeq) {
+                tx = list_entry(ele, kptl_tx_t, tx_list);
 
                 if (cfs_time_aftereq(jiffies, tx->tx_deadline)) {
                         kptllnd_tx_addref(tx);
@@ -898,7 +898,7 @@ kptllnd_find_timed_out_tx(kptl_peer_t *peer)
 void
 kptllnd_peer_check_bucket (int idx, int stamp)
 {
-        cfs_list_t        *peers = &kptllnd_data.kptl_peers[idx];
+        struct list_head        *peers = &kptllnd_data.kptl_peers[idx];
         kptl_peer_t       *peer;
         unsigned long      flags;
 
@@ -908,7 +908,7 @@ kptllnd_peer_check_bucket (int idx, int stamp)
         /* NB. Shared lock while I just look */
 	read_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
 
-        cfs_list_for_each_entry (peer, peers, peer_list) {
+        list_for_each_entry (peer, peers, peer_list) {
                 kptl_tx_t *tx;
                 int        check_sends;
                 int        c = -1, oc = -1, sc = -1;
@@ -1015,12 +1015,12 @@ kptllnd_peer_check_bucket (int idx, int stamp)
 kptl_peer_t *
 kptllnd_id2peer_locked (lnet_process_id_t id)
 {
-        cfs_list_t       *peers = kptllnd_nid2peerlist(id.nid);
-        cfs_list_t       *tmp;
+        struct list_head       *peers = kptllnd_nid2peerlist(id.nid);
+        struct list_head       *tmp;
         kptl_peer_t      *peer;
 
-        cfs_list_for_each (tmp, peers) {
-                peer = cfs_list_entry (tmp, kptl_peer_t, peer_list);
+        list_for_each (tmp, peers) {
+                peer = list_entry (tmp, kptl_peer_t, peer_list);
 
                 LASSERT(peer->peer_state == PEER_STATE_WAITING_HELLO ||
                         peer->peer_state == PEER_STATE_ACTIVE);
@@ -1057,7 +1057,7 @@ __u64
 kptllnd_get_last_seen_matchbits_locked(lnet_process_id_t lpid)
 {
         kptl_peer_t  *peer;
-        cfs_list_t   *tmp;
+        struct list_head   *tmp;
 
         /* Find the last matchbits I saw this new peer using.  Note..
            A. This peer cannot be in the peer table - she's new!
@@ -1072,16 +1072,16 @@ kptllnd_get_last_seen_matchbits_locked(lnet_process_id_t lpid)
         /* peer's last matchbits can't change after it comes out of the peer
          * table, so first match is fine */
 
-        cfs_list_for_each (tmp, &kptllnd_data.kptl_closing_peers) {
-                peer = cfs_list_entry (tmp, kptl_peer_t, peer_list);
+        list_for_each (tmp, &kptllnd_data.kptl_closing_peers) {
+                peer = list_entry (tmp, kptl_peer_t, peer_list);
 
                 if (LNET_NIDADDR(peer->peer_id.nid) == LNET_NIDADDR(lpid.nid) &&
                     peer->peer_id.pid == lpid.pid)
                         return peer->peer_last_matchbits_seen;
         }
 
-        cfs_list_for_each (tmp, &kptllnd_data.kptl_zombie_peers) {
-                peer = cfs_list_entry (tmp, kptl_peer_t, peer_list);
+        list_for_each (tmp, &kptllnd_data.kptl_zombie_peers) {
+                peer = list_entry (tmp, kptl_peer_t, peer_list);
 
                 if (LNET_NIDADDR(peer->peer_id.nid) == LNET_NIDADDR(lpid.nid) &&
                     peer->peer_id.pid == lpid.pid)

@@ -173,7 +173,7 @@ typedef union {
 
 typedef struct kqswnal_rx
 {
-        cfs_list_t           krx_list;     /* enqueue -> thread */
+        struct list_head           krx_list;     /* enqueue -> thread */
         struct kqswnal_rx   *krx_alloclist;/* stack in kqn_rxds */
         EP_RCVR             *krx_eprx;     /* port to post receives to */
         EP_RXD              *krx_rxd;      /* receive descriptor (for repost) */
@@ -197,8 +197,8 @@ typedef struct kqswnal_rx
 
 typedef struct kqswnal_tx
 {
-        cfs_list_t            ktx_list;         /* enqueue idle/active */
-        cfs_list_t            ktx_schedlist;    /* enqueue on scheduler */
+        struct list_head            ktx_list;         /* enqueue idle/active */
+        struct list_head            ktx_schedlist;    /* enqueue on scheduler */
         struct kqswnal_tx    *ktx_alloclist;    /* stack in kqn_txds */
         unsigned int          ktx_state:7;      /* What I'm doing */
         unsigned int          ktx_firsttmpfrag:1;  /* ktx_frags[0] is in my ebuffer ? 0 : 1 */
@@ -262,17 +262,17 @@ typedef struct
         kqswnal_rx_t        *kqn_rxds;        /* stack of all the receive descriptors */
         kqswnal_tx_t        *kqn_txds;        /* stack of all the transmit descriptors */
 
-        cfs_list_t           kqn_idletxds;    /* transmit descriptors free to use */
-        cfs_list_t           kqn_activetxds;  /* transmit descriptors being used */
+        struct list_head           kqn_idletxds;    /* transmit descriptors free to use */
+        struct list_head           kqn_activetxds;  /* transmit descriptors being used */
 	spinlock_t	kqn_idletxd_lock;    /* serialise idle txd access */
 	cfs_atomic_t	kqn_pending_txs;     /* # transmits being prepped */
 
 	spinlock_t	kqn_sched_lock;      /* serialise packet schedulers */
         cfs_waitq_t          kqn_sched_waitq;/* scheduler blocks here */
 
-        cfs_list_t           kqn_readyrxds;  /* rxds full of data */
-        cfs_list_t           kqn_donetxds;   /* completed transmits */
-        cfs_list_t           kqn_delayedtxds;/* delayed transmits */
+        struct list_head           kqn_readyrxds;  /* rxds full of data */
+        struct list_head           kqn_donetxds;   /* completed transmits */
+        struct list_head           kqn_delayedtxds;/* delayed transmits */
 
         EP_SYS              *kqn_ep;         /* elan system */
         EP_NMH              *kqn_ep_tx_nmh;  /* elan reserved tx vaddrs */

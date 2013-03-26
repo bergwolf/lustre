@@ -131,7 +131,7 @@ static inline int osp_sync_has_work(struct osp_device *d)
 		return 1;
 
 	/* has remotely committed? */
-	if (!cfs_list_empty(&d->opd_syn_committed_there))
+	if (!list_empty(&d->opd_syn_committed_there))
 		return 1;
 
 	return 0;
@@ -337,12 +337,12 @@ static void osp_sync_request_commit_cb(struct ptlrpc_request *req)
 	/* XXX: what if request isn't committed for very long? */
 	LASSERT(d);
 	LASSERT(req->rq_svc_thread == (void *) OSP_JOB_MAGIC);
-	LASSERT(cfs_list_empty(&req->rq_exp_list));
+	LASSERT(list_empty(&req->rq_exp_list));
 
 	ptlrpc_request_addref(req);
 
 	spin_lock(&d->opd_syn_lock);
-	cfs_list_add(&req->rq_exp_list, &d->opd_syn_committed_there);
+	list_add(&req->rq_exp_list, &d->opd_syn_committed_there);
 	spin_unlock(&d->opd_syn_lock);
 
 	/* XXX: some batching wouldn't hurt */
@@ -371,12 +371,12 @@ static int osp_sync_interpret(const struct lu_env *env,
 		 * but object doesn't exist anymore - cancell llog record
 		 */
 		LASSERT(req->rq_transno == 0);
-		LASSERT(cfs_list_empty(&req->rq_exp_list));
+		LASSERT(list_empty(&req->rq_exp_list));
 
 		ptlrpc_request_addref(req);
 
 		spin_lock(&d->opd_syn_lock);
-		cfs_list_add(&req->rq_exp_list, &d->opd_syn_committed_there);
+		list_add(&req->rq_exp_list, &d->opd_syn_committed_there);
 		spin_unlock(&d->opd_syn_lock);
 
 		cfs_waitq_signal(&d->opd_syn_waitq);
@@ -471,7 +471,7 @@ static struct ptlrpc_request *osp_sync_new_job(struct osp_device *d,
 	body->oa.o_lcookie.lgc_lgl = llh->lgh_id;
 	body->oa.o_lcookie.lgc_subsys = LLOG_MDS_OST_ORIG_CTXT;
 	body->oa.o_lcookie.lgc_index = h->lrh_index;
-	CFS_INIT_LIST_HEAD(&req->rq_exp_list);
+	INIT_LIST_HEAD(&req->rq_exp_list);
 	req->rq_svc_thread = (void *) OSP_JOB_MAGIC;
 
 	req->rq_interpret_reply = osp_sync_interpret;
@@ -667,12 +667,12 @@ static void osp_sync_process_committed(const struct lu_env *env,
 	struct ptlrpc_request	*req, *tmp;
 	struct llog_ctxt	*ctxt;
 	struct llog_handle	*llh;
-	cfs_list_t		 list;
+	struct list_head		 list;
 	int			 rc, done = 0;
 
 	ENTRY;
 
-	if (cfs_list_empty(&d->opd_syn_committed_there))
+	if (list_empty(&d->opd_syn_committed_there))
 		return;
 
 	/*
@@ -697,15 +697,15 @@ static void osp_sync_process_committed(const struct lu_env *env,
 	llh = ctxt->loc_handle;
 	LASSERT(llh);
 
-	CFS_INIT_LIST_HEAD(&list);
+	INIT_LIST_HEAD(&list);
 	spin_lock(&d->opd_syn_lock);
-	cfs_list_splice(&d->opd_syn_committed_there, &list);
-	CFS_INIT_LIST_HEAD(&d->opd_syn_committed_there);
+	list_splice(&d->opd_syn_committed_there, &list);
+	INIT_LIST_HEAD(&d->opd_syn_committed_there);
 	spin_unlock(&d->opd_syn_lock);
 
-	cfs_list_for_each_entry_safe(req, tmp, &list, rq_exp_list) {
+	list_for_each_entry_safe(req, tmp, &list, rq_exp_list) {
 		LASSERT(req->rq_svc_thread == (void *) OSP_JOB_MAGIC);
-		cfs_list_del_init(&req->rq_exp_list);
+		list_del_init(&req->rq_exp_list);
 
 		body = req_capsule_client_get(&req->rq_pill, &RMF_OST_BODY);
 		LASSERT(body);
@@ -810,7 +810,7 @@ static int osp_sync_process_queues(const struct lu_env *env,
 		l_wait_event(d->opd_syn_waitq,
 			     !osp_sync_running(d) ||
 			     osp_sync_can_process_new(d, rec) ||
-			     !cfs_list_empty(&d->opd_syn_committed_there),
+			     !list_empty(&d->opd_syn_committed_there),
 			     &lwi);
 	} while (1);
 }
@@ -892,7 +892,7 @@ static int osp_sync_thread(void *_arg)
 		LASSERTF(count < 10, "%s: %d %d %sempty\n",
 			 d->opd_obd->obd_name, d->opd_syn_rpc_in_progress,
 			 d->opd_syn_rpc_in_flight,
-			 cfs_list_empty(&d->opd_syn_committed_there) ? "" :"!");
+			 list_empty(&d->opd_syn_committed_there) ? "" :"!");
 
 	}
 
@@ -908,7 +908,7 @@ out:
 		 "%s: %d %d %sempty\n",
 		 d->opd_obd->obd_name, d->opd_syn_rpc_in_progress,
 		 d->opd_syn_rpc_in_flight,
-		 cfs_list_empty(&d->opd_syn_committed_there) ? "" : "!");
+		 list_empty(&d->opd_syn_committed_there) ? "" : "!");
 
 	lu_env_fini(&env);
 
@@ -1049,7 +1049,7 @@ int osp_sync_init(const struct lu_env *env, struct osp_device *d)
 	spin_lock_init(&d->opd_syn_lock);
 	cfs_waitq_init(&d->opd_syn_waitq);
 	cfs_waitq_init(&d->opd_syn_thread.t_ctl_waitq);
-	CFS_INIT_LIST_HEAD(&d->opd_syn_committed_there);
+	INIT_LIST_HEAD(&d->opd_syn_committed_there);
 
 	rc = PTR_ERR(kthread_run(osp_sync_thread, d,
 				 "osp-syn-%u", d->opd_index));
@@ -1090,7 +1090,7 @@ int osp_sync_fini(struct osp_device *d)
 }
 
 static DEFINE_MUTEX(osp_id_tracker_sem);
-static CFS_LIST_HEAD(osp_id_tracker_list);
+static LIST_HEAD(osp_id_tracker_list);
 
 static void osp_sync_tracker_commit_cb(struct thandle *th, void *cookie)
 {
@@ -1110,7 +1110,7 @@ static void osp_sync_tracker_commit_cb(struct thandle *th, void *cookie)
 		       tr->otr_committed_id, txn->oti_current_id);
 		tr->otr_committed_id = txn->oti_current_id;
 
-		cfs_list_for_each_entry(d, &tr->otr_wakeup_list,
+		list_for_each_entry(d, &tr->otr_wakeup_list,
 					opd_syn_ontrack) {
 			d->opd_syn_last_committed_id = tr->otr_committed_id;
 			cfs_waitq_signal(&d->opd_syn_waitq);
@@ -1127,10 +1127,10 @@ static int osp_sync_id_traction_init(struct osp_device *d)
 	LASSERT(d);
 	LASSERT(d->opd_storage);
 	LASSERT(d->opd_syn_tracker == NULL);
-	CFS_INIT_LIST_HEAD(&d->opd_syn_ontrack);
+	INIT_LIST_HEAD(&d->opd_syn_ontrack);
 
 	mutex_lock(&osp_id_tracker_sem);
-	cfs_list_for_each_entry(tr, &osp_id_tracker_list, otr_list) {
+	list_for_each_entry(tr, &osp_id_tracker_list, otr_list) {
 		if (tr->otr_dev == d->opd_storage) {
 			LASSERT(cfs_atomic_read(&tr->otr_refcount));
 			cfs_atomic_inc(&tr->otr_refcount);
@@ -1150,8 +1150,8 @@ static int osp_sync_id_traction_init(struct osp_device *d)
 			tr->otr_next_id = 1;
 			tr->otr_committed_id = 0;
 			cfs_atomic_set(&tr->otr_refcount, 1);
-			CFS_INIT_LIST_HEAD(&tr->otr_wakeup_list);
-			cfs_list_add(&tr->otr_list, &osp_id_tracker_list);
+			INIT_LIST_HEAD(&tr->otr_wakeup_list);
+			list_add(&tr->otr_list, &osp_id_tracker_list);
 			tr->otr_tx_cb.dtc_txn_commit =
 						osp_sync_tracker_commit_cb;
 			tr->otr_tx_cb.dtc_cookie = tr;
@@ -1183,8 +1183,8 @@ static void osp_sync_id_traction_fini(struct osp_device *d)
 	mutex_lock(&osp_id_tracker_sem);
 	if (cfs_atomic_dec_and_test(&tr->otr_refcount)) {
 		dt_txn_callback_del(d->opd_storage, &tr->otr_tx_cb);
-		LASSERT(cfs_list_empty(&tr->otr_wakeup_list));
-		cfs_list_del(&tr->otr_list);
+		LASSERT(list_empty(&tr->otr_wakeup_list));
+		list_del(&tr->otr_list);
 		OBD_FREE_PTR(tr);
 		d->opd_syn_tracker = NULL;
 	}
@@ -1217,8 +1217,8 @@ static __u32 osp_sync_id_get(struct osp_device *d, __u32 id)
 		id = tr->otr_next_id++;
 	if (id > d->opd_syn_last_used_id)
 		d->opd_syn_last_used_id = id;
-	if (cfs_list_empty(&d->opd_syn_ontrack))
-		cfs_list_add(&d->opd_syn_ontrack, &tr->otr_wakeup_list);
+	if (list_empty(&d->opd_syn_ontrack))
+		list_add(&d->opd_syn_ontrack, &tr->otr_wakeup_list);
 	spin_unlock(&tr->otr_lock);
 	CDEBUG(D_OTHER, "new id %u\n", (unsigned) id);
 
@@ -1232,11 +1232,11 @@ static void osp_sync_remove_from_tracker(struct osp_device *d)
 	tr = d->opd_syn_tracker;
 	LASSERT(tr);
 
-	if (cfs_list_empty(&d->opd_syn_ontrack))
+	if (list_empty(&d->opd_syn_ontrack))
 		return;
 
 	spin_lock(&tr->otr_lock);
-	cfs_list_del_init(&d->opd_syn_ontrack);
+	list_del_init(&d->opd_syn_ontrack);
 	spin_unlock(&tr->otr_lock);
 }
 

@@ -128,31 +128,31 @@ void ctx_destroy_pf(struct ptlrpc_sec *sec, struct ptlrpc_cli_ctx *ctx)
 }
 
 static
-void ctx_enhash_pf(struct ptlrpc_cli_ctx *ctx, cfs_hlist_head_t *hash)
+void ctx_enhash_pf(struct ptlrpc_cli_ctx *ctx, struct hlist_head *hash)
 {
 	set_bit(PTLRPC_CTX_CACHED_BIT, &ctx->cc_flags);
         cfs_atomic_inc(&ctx->cc_refcount);
-        cfs_hlist_add_head(&ctx->cc_cache, hash);
+        hlist_add_head(&ctx->cc_cache, hash);
 }
 
 /*
  * caller must hold spinlock
  */
 static
-void ctx_unhash_pf(struct ptlrpc_cli_ctx *ctx, cfs_hlist_head_t *freelist)
+void ctx_unhash_pf(struct ptlrpc_cli_ctx *ctx, struct hlist_head *freelist)
 {
         LASSERT_SPIN_LOCKED(&ctx->cc_sec->ps_lock);
         LASSERT(cfs_atomic_read(&ctx->cc_refcount) > 0);
 	LASSERT(test_bit(PTLRPC_CTX_CACHED_BIT, &ctx->cc_flags));
-        LASSERT(!cfs_hlist_unhashed(&ctx->cc_cache));
+        LASSERT(!hlist_unhashed(&ctx->cc_cache));
 
 	clear_bit(PTLRPC_CTX_CACHED_BIT, &ctx->cc_flags);
 
         if (cfs_atomic_dec_and_test(&ctx->cc_refcount)) {
-                __cfs_hlist_del(&ctx->cc_cache);
-                cfs_hlist_add_head(&ctx->cc_cache, freelist);
+                __hlist_del(&ctx->cc_cache);
+                hlist_add_head(&ctx->cc_cache, freelist);
         } else {
-                cfs_hlist_del_init(&ctx->cc_cache);
+                hlist_del_init(&ctx->cc_cache);
         }
 }
 
@@ -161,7 +161,7 @@ void ctx_unhash_pf(struct ptlrpc_cli_ctx *ctx, cfs_hlist_head_t *freelist)
  */
 static
 int ctx_check_death_pf(struct ptlrpc_cli_ctx *ctx,
-                       cfs_hlist_head_t *freelist)
+                       struct hlist_head *freelist)
 {
         if (cli_ctx_check_death(ctx)) {
                 if (freelist)
@@ -174,7 +174,7 @@ int ctx_check_death_pf(struct ptlrpc_cli_ctx *ctx,
 
 static inline
 int ctx_check_death_locked_pf(struct ptlrpc_cli_ctx *ctx,
-                              cfs_hlist_head_t *freelist)
+                              struct hlist_head *freelist)
 {
         LASSERT(ctx->cc_sec);
         LASSERT(cfs_atomic_read(&ctx->cc_refcount) > 0);
@@ -194,19 +194,19 @@ int ctx_match_pf(struct ptlrpc_cli_ctx *ctx, struct vfs_cred *vcred)
 }
 
 static
-void ctx_list_destroy_pf(cfs_hlist_head_t *head)
+void ctx_list_destroy_pf(struct hlist_head *head)
 {
         struct ptlrpc_cli_ctx *ctx;
 
-        while (!cfs_hlist_empty(head)) {
-                ctx = cfs_hlist_entry(head->first, struct ptlrpc_cli_ctx,
+        while (!hlist_empty(head)) {
+                ctx = hlist_entry(head->first, struct ptlrpc_cli_ctx,
                                       cc_cache);
 
                 LASSERT(cfs_atomic_read(&ctx->cc_refcount) == 0);
 		LASSERT(test_bit(PTLRPC_CTX_CACHED_BIT,
                                      &ctx->cc_flags) == 0);
 
-                cfs_hlist_del_init(&ctx->cc_cache);
+                hlist_del_init(&ctx->cc_cache);
                 ctx_destroy_pf(ctx->cc_sec, ctx);
         }
 }
@@ -236,10 +236,10 @@ void gss_cli_ctx_die_pf(struct ptlrpc_cli_ctx *ctx, int grace)
 	spin_lock(&ctx->cc_sec->ps_lock);
 
 	if (test_and_clear_bit(PTLRPC_CTX_CACHED_BIT, &ctx->cc_flags)) {
-		LASSERT(!cfs_hlist_unhashed(&ctx->cc_cache));
+		LASSERT(!hlist_unhashed(&ctx->cc_cache));
 		LASSERT(cfs_atomic_read(&ctx->cc_refcount) > 1);
 
-		cfs_hlist_del_init(&ctx->cc_cache);
+		hlist_del_init(&ctx->cc_cache);
 		if (cfs_atomic_dec_and_test(&ctx->cc_refcount))
 			LBUG();
 	}
@@ -263,8 +263,8 @@ void gss_sec_ctx_replace_pf(struct gss_sec *gsec,
 {
         struct gss_sec_pipefs *gsec_pf;
         struct ptlrpc_cli_ctx *ctx;
-        cfs_hlist_node_t      *pos, *next;
-        CFS_HLIST_HEAD(freelist);
+        struct hlist_node      *pos, *next;
+        HLIST_HEAD(freelist);
         unsigned int hash;
         ENTRY;
 
@@ -276,7 +276,7 @@ void gss_sec_ctx_replace_pf(struct gss_sec *gsec,
 
 	spin_lock(&gsec->gs_base.ps_lock);
 
-        cfs_hlist_for_each_entry_safe(ctx, pos, next,
+        hlist_for_each_entry_safe(ctx, pos, next,
                                       &gsec_pf->gsp_chash[hash], cc_cache) {
                 if (!ctx_match_pf(ctx, &new->cc_vcred))
                         continue;
@@ -322,11 +322,11 @@ int gss_install_rvs_cli_ctx_pf(struct gss_sec *gsec,
 
 static
 void gss_ctx_cache_gc_pf(struct gss_sec_pipefs *gsec_pf,
-                         cfs_hlist_head_t *freelist)
+                         struct hlist_head *freelist)
 {
         struct ptlrpc_sec       *sec;
         struct ptlrpc_cli_ctx   *ctx;
-        cfs_hlist_node_t        *pos, *next;
+        struct hlist_node        *pos, *next;
         int i;
         ENTRY;
 
@@ -335,7 +335,7 @@ void gss_ctx_cache_gc_pf(struct gss_sec_pipefs *gsec_pf,
         CDEBUG(D_SEC, "do gc on sec %s@%p\n", sec->ps_policy->sp_name, sec);
 
         for (i = 0; i < gsec_pf->gsp_chash_size; i++) {
-                cfs_hlist_for_each_entry_safe(ctx, pos, next,
+                hlist_for_each_entry_safe(ctx, pos, next,
                                               &gsec_pf->gsp_chash[i], cc_cache)
                         ctx_check_death_locked_pf(ctx, freelist);
         }
@@ -362,7 +362,7 @@ struct ptlrpc_sec* gss_sec_create_pf(struct obd_import *imp,
                 hash_size = GSS_SEC_PIPEFS_CTX_HASH_SIZE;
 
         alloc_size = sizeof(*gsec_pf) +
-                     sizeof(cfs_hlist_head_t) * hash_size;
+                     sizeof(struct hlist_head) * hash_size;
 
         OBD_ALLOC(gsec_pf, alloc_size);
         if (!gsec_pf)
@@ -370,7 +370,7 @@ struct ptlrpc_sec* gss_sec_create_pf(struct obd_import *imp,
 
         gsec_pf->gsp_chash_size = hash_size;
         for (i = 0; i < hash_size; i++)
-                CFS_INIT_HLIST_HEAD(&gsec_pf->gsp_chash[i]);
+                INIT_HLIST_HEAD(&gsec_pf->gsp_chash[i]);
 
         if (gss_sec_create_common(&gsec_pf->gsp_base, &gss_policy_pipefs,
                                   imp, ctx, sf))
@@ -412,7 +412,7 @@ void gss_sec_destroy_pf(struct ptlrpc_sec *sec)
         gss_sec_destroy_common(gsec);
 
         OBD_FREE(gsec, sizeof(*gsec_pf) +
-                       sizeof(cfs_hlist_head_t) * gsec_pf->gsp_chash_size);
+                       sizeof(struct hlist_head) * gsec_pf->gsp_chash_size);
 }
 
 static
@@ -423,9 +423,9 @@ struct ptlrpc_cli_ctx * gss_sec_lookup_ctx_pf(struct ptlrpc_sec *sec,
         struct gss_sec         *gsec;
         struct gss_sec_pipefs  *gsec_pf;
         struct ptlrpc_cli_ctx  *ctx = NULL, *new = NULL;
-        cfs_hlist_head_t       *hash_head;
-        cfs_hlist_node_t       *pos, *next;
-        CFS_HLIST_HEAD(freelist);
+        struct hlist_head       *hash_head;
+        struct hlist_node       *pos, *next;
+        HLIST_HEAD(freelist);
         unsigned int            hash, gc = 0, found = 0;
         ENTRY;
 
@@ -449,7 +449,7 @@ retry:
                 gc = 1;
         }
 
-        cfs_hlist_for_each_entry_safe(ctx, pos, next, hash_head, cc_cache) {
+        hlist_for_each_entry_safe(ctx, pos, next, hash_head, cc_cache) {
                 if (gc == 0 &&
                     ctx_check_death_locked_pf(ctx,
                                               remove_dead ? &freelist : NULL))
@@ -464,14 +464,14 @@ retry:
         if (found) {
                 if (new && new != ctx) {
                         /* lost the race, just free it */
-                        cfs_hlist_add_head(&new->cc_cache, &freelist);
+                        hlist_add_head(&new->cc_cache, &freelist);
                         new = NULL;
                 }
 
                 /* hot node, move to head */
                 if (hash_head->first != &ctx->cc_cache) {
-                        __cfs_hlist_del(&ctx->cc_cache);
-                        cfs_hlist_add_head(&ctx->cc_cache, hash_head);
+                        __hlist_del(&ctx->cc_cache);
+                        hlist_add_head(&ctx->cc_cache, hash_head);
                 }
         } else {
                 /* don't allocate for reverse sec */
@@ -517,7 +517,7 @@ void gss_sec_release_ctx_pf(struct ptlrpc_sec *sec,
                             int sync)
 {
 	LASSERT(test_bit(PTLRPC_CTX_CACHED_BIT, &ctx->cc_flags) == 0);
-        LASSERT(cfs_hlist_unhashed(&ctx->cc_cache));
+        LASSERT(hlist_unhashed(&ctx->cc_cache));
 
         /* if required async, we must clear the UPTODATE bit to prevent extra
          * rpcs during destroy procedure. */
@@ -546,8 +546,8 @@ int gss_sec_flush_ctx_cache_pf(struct ptlrpc_sec *sec,
         struct gss_sec          *gsec;
         struct gss_sec_pipefs   *gsec_pf;
         struct ptlrpc_cli_ctx   *ctx;
-        cfs_hlist_node_t        *pos, *next;
-        CFS_HLIST_HEAD(freelist);
+        struct hlist_node        *pos, *next;
+        HLIST_HEAD(freelist);
         int i, busy = 0;
         ENTRY;
 
@@ -558,7 +558,7 @@ int gss_sec_flush_ctx_cache_pf(struct ptlrpc_sec *sec,
 
 	spin_lock(&sec->ps_lock);
         for (i = 0; i < gsec_pf->gsp_chash_size; i++) {
-                cfs_hlist_for_each_entry_safe(ctx, pos, next,
+                hlist_for_each_entry_safe(ctx, pos, next,
                                               &gsec_pf->gsp_chash[i],
                                               cc_cache) {
                         LASSERT(cfs_atomic_read(&ctx->cc_refcount) > 0);
@@ -635,7 +635,7 @@ struct gss_upcall_msg_data {
 struct gss_upcall_msg {
         struct rpc_pipe_msg             gum_base;
         cfs_atomic_t                    gum_refcount;
-        cfs_list_t                      gum_list;
+        struct list_head                      gum_list;
         __u32                           gum_mechidx;
         struct gss_sec                 *gum_gsec;
         struct gss_cli_ctx             *gum_gctx;
@@ -665,7 +665,7 @@ __u32 mech_name2idx(const char *name)
 /* pipefs dentries for each mechanisms */
 static struct dentry *de_pipes[MECH_MAX] = { NULL, };
 /* all upcall messgaes linked here */
-static cfs_list_t upcall_lists[MECH_MAX];
+static struct list_head upcall_lists[MECH_MAX];
 /* and protected by this */
 static spinlock_t upcall_locks[MECH_MAX];
 
@@ -687,7 +687,7 @@ void upcall_msg_enlist(struct gss_upcall_msg *msg)
         __u32 idx = msg->gum_mechidx;
 
         upcall_list_lock(idx);
-        cfs_list_add(&msg->gum_list, &upcall_lists[idx]);
+        list_add(&msg->gum_list, &upcall_lists[idx]);
         upcall_list_unlock(idx);
 }
 
@@ -697,7 +697,7 @@ void upcall_msg_delist(struct gss_upcall_msg *msg)
         __u32 idx = msg->gum_mechidx;
 
         upcall_list_lock(idx);
-        cfs_list_del_init(&msg->gum_list);
+        list_del_init(&msg->gum_list);
         upcall_list_unlock(idx);
 }
 
@@ -722,8 +722,8 @@ void gss_release_msg(struct gss_upcall_msg *gmsg)
                 gmsg->gum_gctx = NULL;
         }
 
-        LASSERT(cfs_list_empty(&gmsg->gum_list));
-        LASSERT(cfs_list_empty(&gmsg->gum_base.list));
+        LASSERT(list_empty(&gmsg->gum_list));
+        LASSERT(list_empty(&gmsg->gum_base.list));
         OBD_FREE_PTR(gmsg);
         EXIT;
 }
@@ -736,10 +736,10 @@ void gss_unhash_msg_nolock(struct gss_upcall_msg *gmsg)
         LASSERT(idx < MECH_MAX);
         LASSERT_SPIN_LOCKED(&upcall_locks[idx]);
 
-        if (cfs_list_empty(&gmsg->gum_list))
+        if (list_empty(&gmsg->gum_list))
                 return;
 
-        cfs_list_del_init(&gmsg->gum_list);
+        list_del_init(&gmsg->gum_list);
         LASSERT(cfs_atomic_read(&gmsg->gum_refcount) > 1);
         cfs_atomic_dec(&gmsg->gum_refcount);
 }
@@ -773,7 +773,7 @@ struct gss_upcall_msg * gss_find_upcall(__u32 mechidx, __u32 seq)
         struct gss_upcall_msg *gmsg;
 
         upcall_list_lock(mechidx);
-        cfs_list_for_each_entry(gmsg, &upcall_lists[mechidx], gum_list) {
+        list_for_each_entry(gmsg, &upcall_lists[mechidx], gum_list) {
                 if (gmsg->gum_data.gum_seq != seq)
                         continue;
 
@@ -955,7 +955,7 @@ void gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
         static cfs_time_t               ratelimit = 0;
         ENTRY;
 
-        LASSERT(cfs_list_empty(&msg->list));
+        LASSERT(list_empty(&msg->list));
 
         /* normally errno is >= 0 */
         if (msg->errno >= 0) {
@@ -998,14 +998,14 @@ void gss_pipe_release(struct inode *inode)
         LASSERT(idx < MECH_MAX);
 
         upcall_list_lock(idx);
-        while (!cfs_list_empty(&upcall_lists[idx])) {
+        while (!list_empty(&upcall_lists[idx])) {
                 struct gss_upcall_msg      *gmsg;
                 struct gss_upcall_msg_data *gumd;
 
-                gmsg = cfs_list_entry(upcall_lists[idx].next,
+                gmsg = list_entry(upcall_lists[idx].next,
                                       struct gss_upcall_msg, gum_list);
                 gumd = &gmsg->gum_data;
-                LASSERT(cfs_list_empty(&gmsg->gum_base.list));
+                LASSERT(list_empty(&gmsg->gum_base.list));
 
                 CERROR("failing remaining msg %p:seq %u, uid %u, svc %u, "
                        "nid "LPX64", obd %.*s\n", gmsg,
@@ -1066,7 +1066,7 @@ int gss_ctx_refresh_pf(struct ptlrpc_cli_ctx *ctx)
                 RETURN(-ENOMEM);
 
         /* initialize pipefs base msg */
-        CFS_INIT_LIST_HEAD(&gmsg->gum_base.list);
+        INIT_LIST_HEAD(&gmsg->gum_base.list);
         gmsg->gum_base.data = &gmsg->gum_data;
         gmsg->gum_base.len = sizeof(gmsg->gum_data);
         gmsg->gum_base.copied = 0;
@@ -1210,7 +1210,7 @@ int __init gss_init_pipefs_upcall(void)
         }
 
         de_pipes[MECH_KRB5] = de;
-        CFS_INIT_LIST_HEAD(&upcall_lists[MECH_KRB5]);
+        INIT_LIST_HEAD(&upcall_lists[MECH_KRB5]);
 	spin_lock_init(&upcall_locks[MECH_KRB5]);
 
 	return 0;
@@ -1222,7 +1222,7 @@ void __exit gss_exit_pipefs_upcall(void)
         __u32   i;
 
         for (i = 0; i < MECH_MAX; i++) {
-                LASSERT(cfs_list_empty(&upcall_lists[i]));
+                LASSERT(list_empty(&upcall_lists[i]));
 
                 /* dput pipe dentry here might cause lgssd oops. */
                 de_pipes[i] = NULL;

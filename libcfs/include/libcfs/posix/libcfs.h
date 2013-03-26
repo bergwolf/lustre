@@ -306,12 +306,12 @@ static inline void cfs_remove_shrinker(struct cfs_shrinker *shrinker)
  ***************************************************************************/
 
 struct radix_tree_root {
-        cfs_list_t list;
+        struct list_head list;
         void *rnode;
 };
 
 struct radix_tree_node {
-        cfs_list_t _node;
+        struct list_head _node;
         unsigned long index;
         void *item;
 };
@@ -326,7 +326,7 @@ struct radix_tree_node {
 
 #define INIT_RADIX_TREE(root, mask)                                     \
 do {                                                                    \
-        CFS_INIT_LIST_HEAD(&((struct radix_tree_root *)root)->list);    \
+        INIT_LIST_HEAD(&((struct radix_tree_root *)root)->list);    \
         ((struct radix_tree_root *)root)->rnode = NULL;                 \
 } while (0)
 
@@ -338,10 +338,10 @@ static inline int radix_tree_insert(struct radix_tree_root *root,
         if (!node)
                 return -ENOMEM;
 
-        CFS_INIT_LIST_HEAD(&node->_node);
+        INIT_LIST_HEAD(&node->_node);
         node->index = idx;
         node->item = item;
-        cfs_list_add_tail(&node->_node, &root->list);
+        list_add_tail(&node->_node, &root->list);
         root->rnode = (void *)1001;
         return 0;
 }
@@ -351,11 +351,10 @@ static inline struct radix_tree_node *radix_tree_lookup0(struct radix_tree_root 
 {
         struct radix_tree_node *node;
 
-        if (cfs_list_empty(&root->list))
+        if (list_empty(&root->list))
                 return NULL;
 
-        cfs_list_for_each_entry_typed(node, &root->list,
-                                      struct radix_tree_node, _node)
+        list_for_each_entry(node, &root->list, _node)
                 if (node->index == idx)
                         return node;
 
@@ -381,10 +380,10 @@ static inline void *radix_tree_delete(struct radix_tree_root *root,
         if (p == NULL)
                 return NULL;
 
-        cfs_list_del_init(&p->_node);
+        list_del_init(&p->_node);
         item = p->item;
         free(p);
-        if (cfs_list_empty(&root->list))
+        if (list_empty(&root->list))
                 root->rnode = NULL;
 
         return item;

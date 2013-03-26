@@ -66,7 +66,7 @@ enum {
 
 
 struct lu_fld_target {
-        cfs_list_t               ft_chain;
+        struct list_head               ft_chain;
         struct obd_export       *ft_exp;
         struct lu_server_fld    *ft_srv;
         __u64                    ft_idx;
@@ -107,7 +107,7 @@ struct lu_client_fld {
 
         /**
          * List of exports client FLD knows about. */
-        cfs_list_t               lcf_targets;
+        struct list_head               lcf_targets;
 
         /**
          * Current hash to be used to chose an export. */

@@ -49,7 +49,7 @@ static int mgs_fs_seq_show(struct seq_file *seq, void *v)
 {
         struct obd_device *obd = seq->private;
 	struct mgs_device *mgs;
-	cfs_list_t list;
+	struct list_head list;
 	struct mgs_direntry *dirent, *n;
 	struct lu_env env;
         int rc, len;
@@ -68,8 +68,8 @@ static int mgs_fs_seq_show(struct seq_file *seq, void *v)
                 CERROR("Can't read config dir\n");
 		GOTO(out, rc);
         }
-	cfs_list_for_each_entry_safe(dirent, n, &list, list) {
-		cfs_list_del(&dirent->list);
+	list_for_each_entry_safe(dirent, n, &list, list) {
+		list_del(&dirent->list);
 		len = strlen(dirent->name);
 		if (len > 7 &&
 		    strncmp(dirent->name + len - 7, "-client", len) == 0)

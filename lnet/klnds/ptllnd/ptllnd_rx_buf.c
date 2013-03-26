@@ -45,7 +45,7 @@ kptllnd_rx_buffer_pool_init(kptl_rx_buffer_pool_t *rxbp)
 {
         memset(rxbp, 0, sizeof(*rxbp));
 	spin_lock_init(&rxbp->rxbp_lock);
-        CFS_INIT_LIST_HEAD(&rxbp->rxbp_list);
+        INIT_LIST_HEAD(&rxbp->rxbp_list);
 }
 
 void
@@ -58,7 +58,7 @@ kptllnd_rx_buffer_destroy(kptl_rx_buffer_t *rxb)
         LASSERT(!rxb->rxb_posted);
         LASSERT(rxb->rxb_idle);
 
-        cfs_list_del(&rxb->rxb_list);
+        list_del(&rxb->rxb_list);
         rxbp->rxbp_count--;
 
         LIBCFS_FREE(rxb->rxb_buffer, kptllnd_rx_buffer_size());
@@ -135,7 +135,7 @@ kptllnd_rx_buffer_pool_reserve(kptl_rx_buffer_pool_t *rxbp, int count)
                         break;
                 }
                 
-                cfs_list_add_tail(&rxb->rxb_list, &rxbp->rxbp_list);
+                list_add_tail(&rxb->rxb_list, &rxbp->rxbp_list);
                 rxbp->rxbp_count++;
 
 		spin_unlock_irqrestore(&rxbp->rxbp_lock, flags);
@@ -174,8 +174,8 @@ kptllnd_rx_buffer_pool_fini(kptl_rx_buffer_pool_t *rxbp)
         int                     rc;
         int                     i;
         unsigned long           flags;
-        cfs_list_t             *tmp;
-        cfs_list_t             *nxt;
+        struct list_head             *tmp;
+        struct list_head             *nxt;
         ptl_handle_md_t         mdh;
 
         /* CAVEAT EMPTOR: I'm racing with everything here!!!
@@ -194,8 +194,8 @@ kptllnd_rx_buffer_pool_fini(kptl_rx_buffer_pool_t *rxbp)
         rxbp->rxbp_shutdown = 1;
 
         for (i = 9;; i++) {
-                cfs_list_for_each_safe(tmp, nxt, &rxbp->rxbp_list) {
-                        rxb = cfs_list_entry (tmp, kptl_rx_buffer_t, rxb_list);
+                list_for_each_safe(tmp, nxt, &rxbp->rxbp_list) {
+                        rxb = list_entry (tmp, kptl_rx_buffer_t, rxb_list);
 
                         if (rxb->rxb_idle) {
 				spin_unlock_irqrestore(&rxbp->rxbp_lock,
@@ -230,7 +230,7 @@ kptllnd_rx_buffer_pool_fini(kptl_rx_buffer_pool_t *rxbp)
 #endif
                 }
 
-                if (cfs_list_empty(&rxbp->rxbp_list))
+                if (list_empty(&rxbp->rxbp_list))
                         break;
 
 		spin_unlock_irqrestore(&rxbp->rxbp_lock, flags);
@@ -480,7 +480,7 @@ kptllnd_rx_buffer_callback (ptl_event_t *ev)
 			spin_lock_irqsave(&kptllnd_data.kptl_sched_lock,
                                               flags);
 
-                        cfs_list_add_tail(&rx->rx_list,
+                        list_add_tail(&rx->rx_list,
                                           &kptllnd_data.kptl_sched_rxq);
                         cfs_waitq_signal(&kptllnd_data.kptl_sched_waitq);
 
@@ -538,7 +538,7 @@ kptllnd_find_net (lnet_nid_t nid)
         kptl_net_t *net;
 
 	read_lock(&kptllnd_data.kptl_net_rw_lock);
-        cfs_list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list) {
+        list_for_each_entry (net, &kptllnd_data.kptl_nets, net_list) {
                 LASSERT (!net->net_shutdown);
 
                 if (net->net_ni->ni_nid == nid) {
@@ -560,14 +560,14 @@ kptllnd_rx_parse(kptl_rx_t *rx)
         int                     post_credit = PTLLND_POSTRX_PEER_CREDIT;
         kptl_net_t             *net = NULL;
         kptl_peer_t            *peer;
-        cfs_list_t              txs;
+        struct list_head              txs;
         unsigned long           flags;
         lnet_process_id_t       srcid;
 
         LASSERT (!cfs_in_interrupt());
         LASSERT (rx->rx_peer == NULL);
 
-        CFS_INIT_LIST_HEAD(&txs);
+        INIT_LIST_HEAD(&txs);
 
         if ((rx->rx_nob >= 4 &&
              (msg->ptlm_magic == LNET_PROTO_MAGIC ||
@@ -815,7 +815,7 @@ kptllnd_rx_parse(kptl_rx_t *rx)
         kptllnd_peer_close(peer, rc);
         if (rx->rx_peer == NULL)                /* drop ref on peer */
                 kptllnd_peer_decref(peer);      /* unless rx_done will */
-        if (!cfs_list_empty(&txs)) {
+        if (!list_empty(&txs)) {
                 LASSERT (net != NULL);
                 kptllnd_restart_txs(net, srcid, &txs);
         }

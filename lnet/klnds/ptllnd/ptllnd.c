@@ -510,7 +510,7 @@ kptllnd_base_shutdown (void)
         lnet_process_id_t process_id;
 
 	read_lock(&kptllnd_data.kptl_net_rw_lock);
-        LASSERT (cfs_list_empty(&kptllnd_data.kptl_nets));
+        LASSERT (list_empty(&kptllnd_data.kptl_nets));
 	read_unlock(&kptllnd_data.kptl_net_rw_lock);
 
         switch (kptllnd_data.kptl_init) {
@@ -521,8 +521,8 @@ kptllnd_base_shutdown (void)
         case PTLLND_INIT_DATA:
                 /* stop receiving */
                 kptllnd_rx_buffer_pool_fini(&kptllnd_data.kptl_rx_buffer_pool);
-                LASSERT (cfs_list_empty(&kptllnd_data.kptl_sched_rxq));
-                LASSERT (cfs_list_empty(&kptllnd_data.kptl_sched_rxbq));
+                LASSERT (list_empty(&kptllnd_data.kptl_sched_rxq));
+                LASSERT (list_empty(&kptllnd_data.kptl_sched_rxbq));
 
                 /* lock to interleave cleanly with peer birth/death */
 		write_lock_irqsave(&kptllnd_data.kptl_peer_rw_lock, flags);
@@ -557,11 +557,11 @@ kptllnd_base_shutdown (void)
                                               flags);
                 }
 
-                LASSERT (cfs_list_empty(&kptllnd_data.kptl_closing_peers));
-                LASSERT (cfs_list_empty(&kptllnd_data.kptl_zombie_peers));
+                LASSERT (list_empty(&kptllnd_data.kptl_closing_peers));
+                LASSERT (list_empty(&kptllnd_data.kptl_zombie_peers));
                 LASSERT (kptllnd_data.kptl_peers != NULL);
                 for (i = 0; i < kptllnd_data.kptl_peer_hash_size; i++)
-                        LASSERT (cfs_list_empty (&kptllnd_data.kptl_peers[i]));
+                        LASSERT (list_empty (&kptllnd_data.kptl_peers[i]));
 
 		read_unlock_irqrestore(&kptllnd_data.kptl_peer_rw_lock,
                                            flags);
@@ -585,7 +585,7 @@ kptllnd_base_shutdown (void)
                 }
 
                 CDEBUG(D_NET, "All Threads stopped\n");
-                LASSERT(cfs_list_empty(&kptllnd_data.kptl_sched_txq));
+                LASSERT(list_empty(&kptllnd_data.kptl_sched_txq));
 
                 kptllnd_cleanup_tx_descs();
 
@@ -615,14 +615,14 @@ kptllnd_base_shutdown (void)
         }
 
         LASSERT (cfs_atomic_read(&kptllnd_data.kptl_ntx) == 0);
-        LASSERT (cfs_list_empty(&kptllnd_data.kptl_idle_txs));
+        LASSERT (list_empty(&kptllnd_data.kptl_idle_txs));
 
         if (kptllnd_data.kptl_rx_cache != NULL)
                 cfs_mem_cache_destroy(kptllnd_data.kptl_rx_cache);
 
         if (kptllnd_data.kptl_peers != NULL)
                 LIBCFS_FREE(kptllnd_data.kptl_peers,
-                            sizeof (cfs_list_t) *
+                            sizeof (struct list_head) *
                             kptllnd_data.kptl_peer_hash_size);
 
         if (kptllnd_data.kptl_nak_msg != NULL)
@@ -676,21 +676,21 @@ kptllnd_base_startup (void)
         kptllnd_data.kptl_nih = PTL_INVALID_HANDLE;
 
 	rwlock_init(&kptllnd_data.kptl_net_rw_lock);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_nets);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_nets);
 
         /* Setup the sched locks/lists/waitq */
 	spin_lock_init(&kptllnd_data.kptl_sched_lock);
         cfs_waitq_init(&kptllnd_data.kptl_sched_waitq);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_sched_txq);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_sched_rxq);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_sched_rxbq);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_sched_txq);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_sched_rxq);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_sched_rxbq);
 
         /* Init kptl_ptlid2str_lock before any call to kptllnd_ptlid2str */
 	spin_lock_init(&kptllnd_data.kptl_ptlid2str_lock);
 
         /* Setup the tx locks/lists */
 	spin_lock_init(&kptllnd_data.kptl_tx_lock);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_idle_txs);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_idle_txs);
         cfs_atomic_set(&kptllnd_data.kptl_ntx, 0);
 
         /* Uptick the module reference count */
@@ -776,14 +776,14 @@ kptllnd_base_startup (void)
 
 	rwlock_init(&kptllnd_data.kptl_peer_rw_lock);
         cfs_waitq_init(&kptllnd_data.kptl_watchdog_waitq);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_closing_peers);
-        CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_zombie_peers);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_closing_peers);
+        INIT_LIST_HEAD(&kptllnd_data.kptl_zombie_peers);
 
         /* Allocate and setup the peer hash table */
         kptllnd_data.kptl_peer_hash_size =
                 *kptllnd_tunables.kptl_peer_hash_table_size;
         LIBCFS_ALLOC(kptllnd_data.kptl_peers,
-                     sizeof(cfs_list_t) *
+                     sizeof(struct list_head) *
                      kptllnd_data.kptl_peer_hash_size);
         if (kptllnd_data.kptl_peers == NULL) {
                 CERROR("Failed to allocate space for peer hash table size=%d\n",
@@ -792,7 +792,7 @@ kptllnd_base_startup (void)
                 goto failed;
         }
         for (i = 0; i < kptllnd_data.kptl_peer_hash_size; i++)
-                CFS_INIT_LIST_HEAD(&kptllnd_data.kptl_peers[i]);
+                INIT_LIST_HEAD(&kptllnd_data.kptl_peers[i]);
 
         kptllnd_rx_buffer_pool_init(&kptllnd_data.kptl_rx_buffer_pool);
 
@@ -911,7 +911,7 @@ kptllnd_startup (lnet_ni_t *ni)
 
         cfs_atomic_set(&net->net_refcount, 1);
 	write_lock(&kptllnd_data.kptl_net_rw_lock);
-        cfs_list_add_tail(&net->net_list, &kptllnd_data.kptl_nets);
+        list_add_tail(&net->net_list, &kptllnd_data.kptl_nets);
 	write_unlock(&kptllnd_data.kptl_net_rw_lock);
         return 0;
 
@@ -937,14 +937,14 @@ kptllnd_shutdown (lnet_ni_t *ni)
 
         LASSERT (ni == net->net_ni);
         LASSERT (!net->net_shutdown);
-        LASSERT (!cfs_list_empty(&net->net_list));
+        LASSERT (!list_empty(&net->net_list));
         LASSERT (cfs_atomic_read(&net->net_refcount) != 0);
         ni->ni_data = NULL;
         net->net_ni = NULL;
 
 	write_lock(&kptllnd_data.kptl_net_rw_lock);
         kptllnd_net_decref(net);
-        cfs_list_del_init(&net->net_list);
+        list_del_init(&net->net_list);
 	write_unlock(&kptllnd_data.kptl_net_rw_lock);
 
         /* Can't nuke peers here - they are shared among all NIs */
@@ -965,7 +965,7 @@ kptllnd_shutdown (lnet_ni_t *ni)
         LIBCFS_FREE(net, sizeof(*net));
 out:
         /* NB no locking since I don't race with writers */
-        if (cfs_list_empty(&kptllnd_data.kptl_nets))
+        if (list_empty(&kptllnd_data.kptl_nets))
                 kptllnd_base_shutdown();
         CDEBUG(D_MALLOC, "after LND cleanup: kmem %d\n",
                cfs_atomic_read (&libcfs_kmemory));

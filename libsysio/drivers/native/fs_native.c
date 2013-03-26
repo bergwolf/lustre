@@ -70,7 +70,6 @@
 #endif
 #include <utime.h>
 #include <sys/uio.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "xtio.h"

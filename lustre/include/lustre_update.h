@@ -34,7 +34,7 @@
 #define UPDATE_BUFFER_SIZE	4096
 struct update_request {
 	struct dt_device	*ur_dt;
-	cfs_list_t		ur_list;    /* attached itself to thandle */
+	struct list_head		ur_list;    /* attached itself to thandle */
 	int			ur_flags;
 	int			ur_rc;	    /* request result */
 	int			ur_batchid; /* Current batch(trans) id */

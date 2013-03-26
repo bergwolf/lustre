@@ -61,7 +61,7 @@
 
 /* per-client-per-object persistent state (LRU) */
 struct ofd_mod_data {
-	cfs_list_t	fmd_list;        /* linked to fed_mod_list */
+	struct list_head	fmd_list;        /* linked to fed_mod_list */
 	struct lu_fid	fmd_fid;         /* FID being written to */
 	__u64		fmd_mactime_xid; /* xid highest {m,a,c}time setattr */
 	cfs_time_t	fmd_expire;      /* time when the fmd should expire */
@@ -106,7 +106,7 @@ static inline void ofd_counter_incr(struct obd_export *exp, int opcode,
 }
 
 struct ofd_seq {
-	cfs_list_t		os_list;
+	struct list_head		os_list;
 	struct	ost_id		os_oi;
 	spinlock_t		os_last_oid_lock;
 	struct mutex		os_create_lock;
@@ -135,7 +135,7 @@ struct ofd_device {
 
 	int			 ofd_subdir_count;
 
-	cfs_list_t		ofd_seq_list;
+	struct list_head		ofd_seq_list;
 	rwlock_t		ofd_seq_list_lock;
 	int			ofd_seq_count;
 	int			ofd_precreate_batch;

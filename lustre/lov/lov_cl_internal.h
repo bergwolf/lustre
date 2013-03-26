@@ -388,7 +388,7 @@ struct lov_lock_link {
          * A linkage into per sub-lock list of all corresponding top-locks,
          * hanging off lovsub_lock::lss_parents.
          */
-        cfs_list_t       lll_list;
+        struct list_head       lll_list;
 };
 
 /**
@@ -400,7 +400,7 @@ struct lovsub_lock {
          * List of top-locks that have given sub-lock as their part. Protected
          * by cl_lock::cll_guard mutex.
          */
-        cfs_list_t            lss_parents;
+        struct list_head            lss_parents;
         /**
          * Top-lock that initiated current operation on this sub-lock. This is
          * only set during top-to-bottom lock operations like enqueue, and is
@@ -451,7 +451,7 @@ struct lov_io_sub {
          * Linkage into a list (hanging off lov_io::lis_active) of all
          * sub-io's active for the current IO iteration.
          */
-        cfs_list_t           sub_linkage;
+        struct list_head           sub_linkage;
         /**
          * true, iff cl_io_init() was successfully executed against
          * lov_io_sub::sub_io.
@@ -527,7 +527,7 @@ struct lov_io {
         /**
          * List of active sub-io's.
          */
-        cfs_list_t         lis_active;
+        struct list_head         lis_active;
 };
 
 struct lov_session {

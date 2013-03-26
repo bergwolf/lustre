@@ -193,7 +193,7 @@ enum {
 struct config_llog_data {
         struct ldlm_res_id          cld_resid;
         struct config_llog_instance cld_cfg;
-        cfs_list_t                  cld_list_chain;
+        struct list_head                  cld_list_chain;
         cfs_atomic_t                cld_refcount;
         struct config_llog_data    *cld_sptlrpc;/* depended sptlrpc log */
         struct config_llog_data    *cld_recover;    /* imperative recover log */
@@ -207,7 +207,7 @@ struct config_llog_data {
 };
 
 struct lustre_profile {
-        cfs_list_t       lp_list;
+        struct list_head       lp_list;
         char            *lp_profile;
         char            *lp_dt;
         char            *lp_md;
@@ -2268,7 +2268,7 @@ struct lwp_register_item {
 	struct obd_export **lri_exp;
 	register_lwp_cb	    lri_cb_func;
 	void		   *lri_cb_data;
-	cfs_list_t	    lri_list;
+	struct list_head	    lri_list;
 	char		    lri_name[MTI_NAME_MAXLEN];
 };
 

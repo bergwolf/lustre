@@ -80,7 +80,7 @@ kranal_schedule_conn(kra_conn_t *conn)
         if (!conn->rac_scheduled) {
                 kranal_conn_addref(conn);       /* +1 ref for scheduler */
                 conn->rac_scheduled = 1;
-                cfs_list_add_tail(&conn->rac_schedlist, &dev->rad_ready_conns);
+                list_add_tail(&conn->rac_schedlist, &dev->rad_ready_conns);
                 cfs_waitq_signal(&dev->rad_waitq);
         }
 
@@ -95,13 +95,13 @@ kranal_get_idle_tx (void)
 
 	spin_lock_irqsave(&kranal_data.kra_tx_lock, flags);
 
-        if (cfs_list_empty(&kranal_data.kra_idle_txs)) {
+        if (list_empty(&kranal_data.kra_idle_txs)) {
 		spin_unlock_irqrestore(&kranal_data.kra_tx_lock, flags);
                 return NULL;
         }
 
-        tx = cfs_list_entry(kranal_data.kra_idle_txs.next, kra_tx_t, tx_list);
-        cfs_list_del(&tx->tx_list);
+        tx = list_entry(kranal_data.kra_idle_txs.next, kra_tx_t, tx_list);
+        list_del(&tx->tx_list);
 
         /* Allocate a new completion cookie.  It might not be needed, but we've
          * got a lock right now... */
@@ -402,7 +402,7 @@ kranal_tx_done (kra_tx_t *tx, int completion)
 
 	spin_lock_irqsave(&kranal_data.kra_tx_lock, flags);
 
-        cfs_list_add_tail(&tx->tx_list, &kranal_data.kra_idle_txs);
+        list_add_tail(&tx->tx_list, &kranal_data.kra_idle_txs);
 
 	spin_unlock_irqrestore(&kranal_data.kra_tx_lock, flags);
 
@@ -418,11 +418,11 @@ kranal_tx_done (kra_tx_t *tx, int completion)
 kra_conn_t *
 kranal_find_conn_locked (kra_peer_t *peer)
 {
-        cfs_list_t *tmp;
+        struct list_head *tmp;
 
         /* just return the first connection */
-        cfs_list_for_each (tmp, &peer->rap_conns) {
-                return cfs_list_entry(tmp, kra_conn_t, rac_list);
+        list_for_each (tmp, &peer->rap_conns) {
+                return list_entry(tmp, kra_conn_t, rac_list);
         }
 
         return NULL;
@@ -436,7 +436,7 @@ kranal_post_fma (kra_conn_t *conn, kra_tx_t *tx)
         tx->tx_conn = conn;
 
 	spin_lock_irqsave(&conn->rac_lock, flags);
-        cfs_list_add_tail(&tx->tx_list, &conn->rac_fmaq);
+        list_add_tail(&tx->tx_list, &conn->rac_fmaq);
         tx->tx_qtime = jiffies;
 	spin_unlock_irqrestore(&conn->rac_lock, flags);
 
@@ -509,7 +509,7 @@ kranal_launch_tx (kra_tx_t *tx, lnet_nid_t nid)
         LASSERT (peer->rap_persistence > 0);
 
         if (!peer->rap_connecting) {
-                LASSERT (cfs_list_empty(&peer->rap_tx_queue));
+                LASSERT (list_empty(&peer->rap_tx_queue));
 
                 if (!(peer->rap_reconnect_interval == 0 || /* first attempt */
                       cfs_time_aftereq(jiffies, peer->rap_reconnect_time))) {
@@ -523,7 +523,7 @@ kranal_launch_tx (kra_tx_t *tx, lnet_nid_t nid)
 
 		spin_lock(&kranal_data.kra_connd_lock);
 
-                cfs_list_add_tail(&peer->rap_connd_list,
+                list_add_tail(&peer->rap_connd_list,
                               &kranal_data.kra_connd_peers);
                 cfs_waitq_signal(&kranal_data.kra_connd_waitq);
 
@@ -531,7 +531,7 @@ kranal_launch_tx (kra_tx_t *tx, lnet_nid_t nid)
         }
 
         /* A connection is being established; queue the message... */
-        cfs_list_add_tail(&tx->tx_list, &peer->rap_tx_queue);
+        list_add_tail(&tx->tx_list, &peer->rap_tx_queue);
 
 	write_unlock_irqrestore(g_lock, flags);
 }
@@ -574,7 +574,7 @@ kranal_rdma(kra_tx_t *tx, int type,
         LASSERT (rrc == RAP_SUCCESS);
 
 	spin_lock_irqsave(&conn->rac_lock, flags);
-        cfs_list_add_tail(&tx->tx_list, &conn->rac_rdmaq);
+        list_add_tail(&tx->tx_list, &conn->rac_rdmaq);
         tx->tx_qtime = jiffies;
 	spin_unlock_irqrestore(&conn->rac_lock, flags);
 }
@@ -910,7 +910,7 @@ int
 kranal_check_conn_timeouts (kra_conn_t *conn)
 {
         kra_tx_t          *tx;
-        cfs_list_t        *ttmp;
+        struct list_head        *ttmp;
         unsigned long      flags;
         long               timeout;
         unsigned long      now = jiffies;
@@ -948,8 +948,8 @@ kranal_check_conn_timeouts (kra_conn_t *conn)
 
 	spin_lock_irqsave(&conn->rac_lock, flags);
 
-        cfs_list_for_each (ttmp, &conn->rac_fmaq) {
-                tx = cfs_list_entry(ttmp, kra_tx_t, tx_list);
+        list_for_each (ttmp, &conn->rac_fmaq) {
+                tx = list_entry(ttmp, kra_tx_t, tx_list);
 
                 if (cfs_time_aftereq(now, tx->tx_qtime + timeout)) {
 			spin_unlock_irqrestore(&conn->rac_lock, flags);
@@ -960,8 +960,8 @@ kranal_check_conn_timeouts (kra_conn_t *conn)
                 }
         }
 
-        cfs_list_for_each (ttmp, &conn->rac_rdmaq) {
-                tx = cfs_list_entry(ttmp, kra_tx_t, tx_list);
+        list_for_each (ttmp, &conn->rac_rdmaq) {
+                tx = list_entry(ttmp, kra_tx_t, tx_list);
 
                 if (cfs_time_aftereq(now, tx->tx_qtime + timeout)) {
 			spin_unlock_irqrestore(&conn->rac_lock, flags);
@@ -972,8 +972,8 @@ kranal_check_conn_timeouts (kra_conn_t *conn)
                 }
         }
 
-        cfs_list_for_each (ttmp, &conn->rac_replyq) {
-                tx = cfs_list_entry(ttmp, kra_tx_t, tx_list);
+        list_for_each (ttmp, &conn->rac_replyq) {
+                tx = list_entry(ttmp, kra_tx_t, tx_list);
 
                 if (cfs_time_aftereq(now, tx->tx_qtime + timeout)) {
 			spin_unlock_irqrestore(&conn->rac_lock, flags);
@@ -991,8 +991,8 @@ kranal_check_conn_timeouts (kra_conn_t *conn)
 void
 kranal_reaper_check (int idx, unsigned long *min_timeoutp)
 {
-        cfs_list_t        *conns = &kranal_data.kra_conns[idx];
-        cfs_list_t        *ctmp;
+        struct list_head        *conns = &kranal_data.kra_conns[idx];
+        struct list_head        *ctmp;
         kra_conn_t        *conn;
         unsigned long      flags;
         int                rc;
@@ -1002,8 +1002,8 @@ kranal_reaper_check (int idx, unsigned long *min_timeoutp)
          * we just use a shared lock while we take a look... */
 	read_lock(&kranal_data.kra_global_lock);
 
-        cfs_list_for_each (ctmp, conns) {
-                conn = cfs_list_entry(ctmp, kra_conn_t, rac_hashlist);
+        list_for_each (ctmp, conns) {
+                conn = list_entry(ctmp, kra_conn_t, rac_hashlist);
 
                 if (conn->rac_timeout < *min_timeoutp )
                         *min_timeoutp = conn->rac_timeout;
@@ -1067,10 +1067,10 @@ kranal_connd (void *arg)
         while (!kranal_data.kra_shutdown) {
                 did_something = 0;
 
-                if (!cfs_list_empty(&kranal_data.kra_connd_acceptq)) {
-                        ras = cfs_list_entry(kranal_data.kra_connd_acceptq.next,
+                if (!list_empty(&kranal_data.kra_connd_acceptq)) {
+                        ras = list_entry(kranal_data.kra_connd_acceptq.next,
                                              kra_acceptsock_t, ras_list);
-                        cfs_list_del(&ras->ras_list);
+                        list_del(&ras->ras_list);
 
 			spin_unlock_irqrestore(&kranal_data.kra_connd_lock,
                                                    flags);
@@ -1087,11 +1087,11 @@ kranal_connd (void *arg)
                         did_something = 1;
                 }
 
-                if (!cfs_list_empty(&kranal_data.kra_connd_peers)) {
-                        peer = cfs_list_entry(kranal_data.kra_connd_peers.next,
+                if (!list_empty(&kranal_data.kra_connd_peers)) {
+                        peer = list_entry(kranal_data.kra_connd_peers.next,
                                               kra_peer_t, rap_connd_list);
 
-                        cfs_list_del_init(&peer->rap_connd_list);
+                        list_del_init(&peer->rap_connd_list);
 			spin_unlock_irqrestore(&kranal_data.kra_connd_lock,
                                                    flags);
 
@@ -1294,19 +1294,19 @@ kranal_check_rdma_cq (kra_device_t *dev)
                 LASSERT (rrc == RAP_SUCCESS);
 
                 CDEBUG(D_NET, "Completed %p\n",
-                       cfs_list_entry(conn->rac_rdmaq.next, kra_tx_t, tx_list));
+                       list_entry(conn->rac_rdmaq.next, kra_tx_t, tx_list));
 
 		spin_lock_irqsave(&conn->rac_lock, flags);
 
-                LASSERT (!cfs_list_empty(&conn->rac_rdmaq));
-                tx = cfs_list_entry(conn->rac_rdmaq.next, kra_tx_t, tx_list);
-                cfs_list_del(&tx->tx_list);
+                LASSERT (!list_empty(&conn->rac_rdmaq));
+                tx = list_entry(conn->rac_rdmaq.next, kra_tx_t, tx_list);
+                list_del(&tx->tx_list);
 
                 LASSERT(desc->AppPtr == (void *)tx);
                 LASSERT(tx->tx_msg.ram_type == RANAL_MSG_PUT_DONE ||
                         tx->tx_msg.ram_type == RANAL_MSG_GET_DONE);
 
-                cfs_list_add_tail(&tx->tx_list, &conn->rac_fmaq);
+                list_add_tail(&tx->tx_list, &conn->rac_fmaq);
                 tx->tx_qtime = jiffies;
 
 		spin_unlock_irqrestore(&conn->rac_lock, flags);
@@ -1326,8 +1326,8 @@ kranal_check_fma_cq (kra_device_t *dev)
         RAP_RETURN          rrc;
         __u32               cqid;
         __u32               event_type;
-        cfs_list_t         *conns;
-        cfs_list_t         *tmp;
+        struct list_head         *conns;
+        struct list_head         *tmp;
         int                 i;
 
         for (;;) {
@@ -1367,8 +1367,8 @@ kranal_check_fma_cq (kra_device_t *dev)
 
                         conns = &kranal_data.kra_conns[i];
 
-                        cfs_list_for_each (tmp, conns) {
-                                conn = cfs_list_entry(tmp, kra_conn_t,
+                        list_for_each (tmp, conns) {
+                                conn = list_entry(tmp, kra_conn_t,
                                                       rac_hashlist);
 
                                 if (conn->rac_device == dev)
@@ -1450,7 +1450,7 @@ kranal_process_fmaq (kra_conn_t *conn)
         LASSERT (current == conn->rac_device->rad_scheduler);
 
         if (conn->rac_state != RANAL_CONN_ESTABLISHED) {
-                if (!cfs_list_empty(&conn->rac_rdmaq)) {
+                if (!list_empty(&conn->rac_rdmaq)) {
                         /* RDMAs in progress */
                         LASSERT (!conn->rac_close_sent);
 
@@ -1490,7 +1490,7 @@ kranal_process_fmaq (kra_conn_t *conn)
 
 	spin_lock_irqsave(&conn->rac_lock, flags);
 
-        if (cfs_list_empty(&conn->rac_fmaq)) {
+        if (list_empty(&conn->rac_fmaq)) {
 
 		spin_unlock_irqrestore(&conn->rac_lock, flags);
 
@@ -1507,9 +1507,9 @@ kranal_process_fmaq (kra_conn_t *conn)
                 return;
         }
 
-        tx = cfs_list_entry(conn->rac_fmaq.next, kra_tx_t, tx_list);
-        cfs_list_del(&tx->tx_list);
-        more_to_do = !cfs_list_empty(&conn->rac_fmaq);
+        tx = list_entry(conn->rac_fmaq.next, kra_tx_t, tx_list);
+        list_del(&tx->tx_list);
+        more_to_do = !list_empty(&conn->rac_fmaq);
 
 	spin_unlock_irqrestore(&conn->rac_lock, flags);
 
@@ -1569,7 +1569,7 @@ kranal_process_fmaq (kra_conn_t *conn)
                  * fmaq and I'll get rescheduled when credits appear */
                 CDEBUG(D_NET, "EAGAIN on %p\n", conn);
 		spin_lock_irqsave(&conn->rac_lock, flags);
-                cfs_list_add(&tx->tx_list, &conn->rac_fmaq);
+                list_add(&tx->tx_list, &conn->rac_fmaq);
 		spin_unlock_irqrestore(&conn->rac_lock, flags);
                 return;
         }
@@ -1580,7 +1580,7 @@ kranal_process_fmaq (kra_conn_t *conn)
                 /* LASSERT(current) above ensures this doesn't race with reply
                  * processing */
 		spin_lock_irqsave(&conn->rac_lock, flags);
-                cfs_list_add_tail(&tx->tx_list, &conn->rac_replyq);
+                list_add_tail(&tx->tx_list, &conn->rac_replyq);
                 tx->tx_qtime = jiffies;
 		spin_unlock_irqrestore(&conn->rac_lock, flags);
         }
@@ -1605,14 +1605,14 @@ kranal_swab_rdma_desc (kra_rdma_desc_t *d)
 kra_tx_t *
 kranal_match_reply(kra_conn_t *conn, int type, __u64 cookie)
 {
-        cfs_list_t       *ttmp;
+        struct list_head       *ttmp;
         kra_tx_t         *tx;
         unsigned long     flags;
 
 	spin_lock_irqsave(&conn->rac_lock, flags);
 
-        cfs_list_for_each(ttmp, &conn->rac_replyq) {
-                tx = cfs_list_entry(ttmp, kra_tx_t, tx_list);
+        list_for_each(ttmp, &conn->rac_replyq) {
+                tx = list_entry(ttmp, kra_tx_t, tx_list);
 
                 CDEBUG(D_NET,"Checking %p %02x/"LPX64"\n",
                        tx, tx->tx_msg.ram_type, tx->tx_cookie);
@@ -1629,7 +1629,7 @@ kranal_match_reply(kra_conn_t *conn, int type, __u64 cookie)
                         return NULL;
                 }
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
 		spin_unlock_irqrestore(&conn->rac_lock, flags);
                 return tx;
         }
@@ -1878,22 +1878,22 @@ kranal_complete_closed_conn (kra_conn_t *conn)
         int         nreplies;
 
         LASSERT (conn->rac_state == RANAL_CONN_CLOSED);
-        LASSERT (cfs_list_empty(&conn->rac_list));
-        LASSERT (cfs_list_empty(&conn->rac_hashlist));
+        LASSERT (list_empty(&conn->rac_list));
+        LASSERT (list_empty(&conn->rac_hashlist));
 
-        for (nfma = 0; !cfs_list_empty(&conn->rac_fmaq); nfma++) {
-                tx = cfs_list_entry(conn->rac_fmaq.next, kra_tx_t, tx_list);
+        for (nfma = 0; !list_empty(&conn->rac_fmaq); nfma++) {
+                tx = list_entry(conn->rac_fmaq.next, kra_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 kranal_tx_done(tx, -ECONNABORTED);
         }
 
-        LASSERT (cfs_list_empty(&conn->rac_rdmaq));
+        LASSERT (list_empty(&conn->rac_rdmaq));
 
-        for (nreplies = 0; !cfs_list_empty(&conn->rac_replyq); nreplies++) {
-                tx = cfs_list_entry(conn->rac_replyq.next, kra_tx_t, tx_list);
+        for (nreplies = 0; !list_empty(&conn->rac_replyq); nreplies++) {
+                tx = list_entry(conn->rac_replyq.next, kra_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 kranal_tx_done(tx, -ECONNABORTED);
         }
 
@@ -1932,8 +1932,8 @@ kranal_scheduler (void *arg)
         unsigned long     soonest;
         int               nsoonest;
         long              timeout;
-        cfs_list_t       *tmp;
-        cfs_list_t       *nxt;
+        struct list_head       *tmp;
+        struct list_head       *nxt;
         int               rc;
         int               dropped_lock;
         int               busy_loops = 0;
@@ -1971,10 +1971,10 @@ kranal_scheduler (void *arg)
 			spin_lock_irqsave(&dev->rad_lock, flags);
                 }
 
-                cfs_list_for_each_safe(tmp, nxt, &dev->rad_ready_conns) {
-                        conn = cfs_list_entry(tmp, kra_conn_t, rac_schedlist);
+                list_for_each_safe(tmp, nxt, &dev->rad_ready_conns) {
+                        conn = list_entry(tmp, kra_conn_t, rac_schedlist);
 
-                        cfs_list_del_init(&conn->rac_schedlist);
+                        list_del_init(&conn->rac_schedlist);
                         LASSERT (conn->rac_scheduled);
                         conn->rac_scheduled = 0;
 			spin_unlock_irqrestore(&dev->rad_lock, flags);
@@ -1993,8 +1993,8 @@ kranal_scheduler (void *arg)
                 nsoonest = 0;
                 soonest = jiffies;
 
-                cfs_list_for_each_safe(tmp, nxt, &dev->rad_new_conns) {
-                        conn = cfs_list_entry(tmp, kra_conn_t, rac_schedlist);
+                list_for_each_safe(tmp, nxt, &dev->rad_new_conns) {
+                        conn = list_entry(tmp, kra_conn_t, rac_schedlist);
 
                         deadline = conn->rac_last_tx + conn->rac_keepalive;
                         if (cfs_time_aftereq(jiffies, deadline)) {
@@ -2008,7 +2008,7 @@ kranal_scheduler (void *arg)
                                         /* All done with this conn */
 					spin_lock_irqsave(&dev->rad_lock,
                                                               flags);
-                                        cfs_list_del_init(&conn->rac_schedlist);
+                                        list_del_init(&conn->rac_schedlist);
 					spin_unlock_irqrestore(&dev-> \
                                                                    rad_lock,
                                                                    flags);

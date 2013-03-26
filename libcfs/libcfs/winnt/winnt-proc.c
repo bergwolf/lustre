@@ -794,7 +794,7 @@ int proc_init_fs()
     cfs_proc_entry_t * root = NULL;
 
     memset(&(root_table_header), 0, sizeof(struct ctl_table_header));
-    CFS_INIT_LIST_HEAD(&(root_table_header.ctl_entry));
+    INIT_LIST_HEAD(&(root_table_header.ctl_entry));
 
     INIT_PROCFS_LOCK();
     proc_entry_cache = cfs_mem_cache_create(
@@ -1348,7 +1348,7 @@ repeat:
 int do_sysctl(int *name, int nlen, void *oldval, size_t *oldlenp,
            void *newval, size_t newlen)
 {
-    cfs_list_t *tmp;
+    struct list_head *tmp;
 
     if (nlen <= 0 || nlen >= CTL_MAXNAME)
         return -ENOTDIR;
@@ -1360,7 +1360,7 @@ int do_sysctl(int *name, int nlen, void *oldval, size_t *oldlenp,
     tmp = &root_table_header.ctl_entry;
     do {
         struct ctl_table_header *head =
-            cfs_list_entry(tmp, struct ctl_table_header, ctl_entry);
+            list_entry(tmp, struct ctl_table_header, ctl_entry);
         void *context = NULL;
         int error = parse_table(name, nlen, oldval, oldlenp, 
                     newval, newlen, head->ctl_table,
@@ -1452,11 +1452,11 @@ struct ctl_table_header *register_sysctl_table(cfs_sysctl_table_t * table,
         return NULL;
     tmp->ctl_table = table;
 
-    CFS_INIT_LIST_HEAD(&tmp->ctl_entry);
+    INIT_LIST_HEAD(&tmp->ctl_entry);
     if (insert_at_head)
-        cfs_list_add(&tmp->ctl_entry, &root_table_header.ctl_entry);
+        list_add(&tmp->ctl_entry, &root_table_header.ctl_entry);
     else
-        cfs_list_add_tail(&tmp->ctl_entry, &root_table_header.ctl_entry);
+        list_add_tail(&tmp->ctl_entry, &root_table_header.ctl_entry);
 #ifdef CONFIG_PROC_FS
     register_proc_table(table, cfs_proc_sys);
 #endif
@@ -1472,7 +1472,7 @@ struct ctl_table_header *register_sysctl_table(cfs_sysctl_table_t * table,
  */
 void unregister_sysctl_table(struct ctl_table_header * header)
 {
-    cfs_list_del(&header->ctl_entry);
+    list_del(&header->ctl_entry);
 #ifdef CONFIG_PROC_FS
     unregister_proc_table(header->ctl_table, cfs_proc_sys);
 #endif
@@ -2276,11 +2276,11 @@ int seq_puts(struct seq_file *m, const char *s)
 }
 EXPORT_SYMBOL(seq_puts);
 
-cfs_list_t *seq_list_start(cfs_list_t *head, loff_t pos)
+struct list_head *seq_list_start(struct list_head *head, loff_t pos)
 {
-	cfs_list_t *lh;
+	struct list_head *lh;
 
-	cfs_list_for_each(lh, head)
+	list_for_each(lh, head)
 		if (pos-- == 0)
 			return lh;
 
@@ -2289,7 +2289,7 @@ cfs_list_t *seq_list_start(cfs_list_t *head, loff_t pos)
 
 EXPORT_SYMBOL(seq_list_start);
 
-cfs_list_t *seq_list_start_head(cfs_list_t *head,
+struct list_head *seq_list_start_head(struct list_head *head,
                                 loff_t pos)
 {
 	if (!pos)
@@ -2300,12 +2300,12 @@ cfs_list_t *seq_list_start_head(cfs_list_t *head,
 
 EXPORT_SYMBOL(seq_list_start_head);
 
-cfs_list_t *seq_list_next(void *v, cfs_list_t *head,
+struct list_head *seq_list_next(void *v, struct list_head *head,
                           loff_t *ppos)
 {
-	cfs_list_t *lh;
+	struct list_head *lh;
 
-	lh = ((cfs_list_t *)v)->next;
+	lh = ((struct list_head *)v)->next;
 	++*ppos;
 	return lh == head ? NULL : lh;
 }

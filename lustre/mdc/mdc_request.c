@@ -1732,7 +1732,7 @@ static int mdc_quotactl(struct obd_device *unused, struct obd_export *exp,
 static int mdc_ioc_swap_layouts(struct obd_export *exp,
 				struct md_op_data *op_data)
 {
-	CFS_LIST_HEAD(cancels);
+	LIST_HEAD(cancels);
 	struct ptlrpc_request	*req;
 	int			 rc, count;
 	struct mdc_swap_layouts *msl, *payload;

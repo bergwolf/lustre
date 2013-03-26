@@ -48,7 +48,6 @@
 #include <assert.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "inode.h"

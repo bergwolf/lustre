@@ -324,9 +324,9 @@ void sptlrpc_cli_ctx_wakeup(struct ptlrpc_cli_ctx *ctx)
 	struct ptlrpc_request *req, *next;
 
 	spin_lock(&ctx->cc_lock);
-	cfs_list_for_each_entry_safe(req, next, &ctx->cc_req_list,
+	list_for_each_entry_safe(req, next, &ctx->cc_req_list,
 				     rq_ctx_chain) {
-		cfs_list_del_init(&req->rq_ctx_chain);
+		list_del_init(&req->rq_ctx_chain);
 		ptlrpc_client_wake_req(req);
 	}
 	spin_unlock(&ctx->cc_lock);
@@ -441,9 +441,9 @@ void sptlrpc_req_put_ctx(struct ptlrpc_request *req, int sync)
         /* request might be asked to release earlier while still
          * in the context waiting list.
          */
-        if (!cfs_list_empty(&req->rq_ctx_chain)) {
+        if (!list_empty(&req->rq_ctx_chain)) {
 		spin_lock(&req->rq_cli_ctx->cc_lock);
-		cfs_list_del_init(&req->rq_ctx_chain);
+		list_del_init(&req->rq_ctx_chain);
 		spin_unlock(&req->rq_cli_ctx->cc_lock);
         }
 
@@ -619,8 +619,8 @@ static
 void req_off_ctx_list(struct ptlrpc_request *req, struct ptlrpc_cli_ctx *ctx)
 {
 	spin_lock(&ctx->cc_lock);
-	if (!cfs_list_empty(&req->rq_ctx_chain))
-		cfs_list_del_init(&req->rq_ctx_chain);
+	if (!list_empty(&req->rq_ctx_chain))
+		list_del_init(&req->rq_ctx_chain);
 	spin_unlock(&ctx->cc_lock);
 }
 
@@ -759,8 +759,8 @@ again:
          * waiting list
          */
 	spin_lock(&ctx->cc_lock);
-	if (cfs_list_empty(&req->rq_ctx_chain))
-		cfs_list_add(&req->rq_ctx_chain, &ctx->cc_req_list);
+	if (list_empty(&req->rq_ctx_chain))
+		list_add(&req->rq_ctx_chain, &ctx->cc_req_list);
 	spin_unlock(&ctx->cc_lock);
 
 	if (timeout < 0)
@@ -922,7 +922,7 @@ int sptlrpc_import_check_ctx(struct obd_import *imp)
 
 	spin_lock_init(&req->rq_lock);
         cfs_atomic_set(&req->rq_refcount, 10000);
-        CFS_INIT_LIST_HEAD(&req->rq_ctx_chain);
+        INIT_LIST_HEAD(&req->rq_ctx_chain);
         cfs_waitq_init(&req->rq_reply_waitq);
         cfs_waitq_init(&req->rq_set_waitq);
         req->rq_import = imp;
@@ -930,7 +930,7 @@ int sptlrpc_import_check_ctx(struct obd_import *imp)
         req->rq_cli_ctx = ctx;
 
         rc = sptlrpc_req_refresh_ctx(req, 0);
-        LASSERT(cfs_list_empty(&req->rq_ctx_chain));
+        LASSERT(list_empty(&req->rq_ctx_chain));
         sptlrpc_cli_ctx_put(req->rq_cli_ctx, 1);
         OBD_FREE_PTR(req);
 
@@ -1949,7 +1949,7 @@ void sptlrpc_target_update_exp_flavor(struct obd_device *obd,
 
 	spin_lock(&obd->obd_dev_lock);
 
-	cfs_list_for_each_entry(exp, &obd->obd_exports, exp_obd_chain) {
+	list_for_each_entry(exp, &obd->obd_exports, exp_obd_chain) {
 		if (exp->exp_connection == NULL)
 			continue;
 

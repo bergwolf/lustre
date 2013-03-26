@@ -520,7 +520,7 @@ static int mdc_req_avail(struct client_obd *cli, struct mdc_cache_waiter *mcw)
         int rc;
         ENTRY;
         client_obd_list_lock(&cli->cl_loi_list_lock);
-        rc = cfs_list_empty(&mcw->mcw_entry);
+        rc = list_empty(&mcw->mcw_entry);
         client_obd_list_unlock(&cli->cl_loi_list_lock);
         RETURN(rc);
 };
@@ -536,15 +536,15 @@ int mdc_enter_request(struct client_obd *cli)
 
         client_obd_list_lock(&cli->cl_loi_list_lock);
         if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
-                cfs_list_add_tail(&mcw.mcw_entry, &cli->cl_cache_waiters);
+                list_add_tail(&mcw.mcw_entry, &cli->cl_cache_waiters);
                 cfs_waitq_init(&mcw.mcw_waitq);
                 client_obd_list_unlock(&cli->cl_loi_list_lock);
                 rc = l_wait_event(mcw.mcw_waitq, mdc_req_avail(cli, &mcw), &lwi);
                 if (rc) {
                         client_obd_list_lock(&cli->cl_loi_list_lock);
-                        if (cfs_list_empty(&mcw.mcw_entry))
+                        if (list_empty(&mcw.mcw_entry))
                                 cli->cl_r_in_flight--;
-                        cfs_list_del_init(&mcw.mcw_entry);
+                        list_del_init(&mcw.mcw_entry);
                         client_obd_list_unlock(&cli->cl_loi_list_lock);
                 }
         } else {
@@ -556,19 +556,19 @@ int mdc_enter_request(struct client_obd *cli)
 
 void mdc_exit_request(struct client_obd *cli)
 {
-        cfs_list_t *l, *tmp;
+        struct list_head *l, *tmp;
         struct mdc_cache_waiter *mcw;
 
         client_obd_list_lock(&cli->cl_loi_list_lock);
         cli->cl_r_in_flight--;
-        cfs_list_for_each_safe(l, tmp, &cli->cl_cache_waiters) {
+        list_for_each_safe(l, tmp, &cli->cl_cache_waiters) {
                 if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
                         /* No free request slots anymore */
                         break;
                 }
 
-                mcw = cfs_list_entry(l, struct mdc_cache_waiter, mcw_entry);
-                cfs_list_del_init(&mcw->mcw_entry);
+                mcw = list_entry(l, struct mdc_cache_waiter, mcw_entry);
+                list_del_init(&mcw->mcw_entry);
                 cli->cl_r_in_flight++;
                 cfs_waitq_signal(&mcw->mcw_waitq);
         }

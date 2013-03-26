@@ -98,7 +98,7 @@ static void llu_fsop_gone(struct filesys *fs)
         int next = 0;
         ENTRY;
 
-        cfs_list_del(&sbi->ll_conn_chain);
+        list_del(&sbi->ll_conn_chain);
         cl_sb_fini(sbi);
         obd_disconnect(sbi->ll_dt_exp);
         obd_disconnect(sbi->ll_md_exp);
@@ -1872,7 +1872,7 @@ llu_fsswop_mount(const char *source,
         if (!sbi)
                 RETURN(-ENOMEM);
 
-        CFS_INIT_LIST_HEAD(&sbi->ll_conn_chain);
+        INIT_LIST_HEAD(&sbi->ll_conn_chain);
         ll_generate_random_uuid(uuid);
         class_uuid_unparse(uuid, &sbi->ll_sb_uuid);
 

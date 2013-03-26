@@ -58,7 +58,7 @@
 
 cfs_mem_cache_t *ll_file_data_slab;
 
-CFS_LIST_HEAD(ll_super_blocks);
+LIST_HEAD(ll_super_blocks);
 DEFINE_SPINLOCK(ll_sb_lock);
 
 #ifndef MS_HAS_NEW_AOPS
@@ -104,22 +104,22 @@ static struct ll_sb_info *ll_init_sbi(void)
 	sbi->ll_cache.ccc_lru_max = lru_page_max;
 	cfs_atomic_set(&sbi->ll_cache.ccc_lru_left, lru_page_max);
 	spin_lock_init(&sbi->ll_cache.ccc_lru_lock);
-	CFS_INIT_LIST_HEAD(&sbi->ll_cache.ccc_lru);
+	INIT_LIST_HEAD(&sbi->ll_cache.ccc_lru);
 
         sbi->ll_ra_info.ra_max_pages_per_file = min(pages / 32,
                                            SBI_DEFAULT_READAHEAD_MAX);
         sbi->ll_ra_info.ra_max_pages = sbi->ll_ra_info.ra_max_pages_per_file;
         sbi->ll_ra_info.ra_max_read_ahead_whole_pages =
                                            SBI_DEFAULT_READAHEAD_WHOLE_MAX;
-        CFS_INIT_LIST_HEAD(&sbi->ll_conn_chain);
-        CFS_INIT_LIST_HEAD(&sbi->ll_orphan_dentry_list);
+        INIT_LIST_HEAD(&sbi->ll_conn_chain);
+        INIT_LIST_HEAD(&sbi->ll_orphan_dentry_list);
 
         ll_generate_random_uuid(uuid);
         class_uuid_unparse(uuid, &sbi->ll_sb_uuid);
         CDEBUG(D_CONFIG, "generated uuid: %s\n", sbi->ll_sb_uuid.uuid);
 
 	spin_lock(&ll_sb_lock);
-	cfs_list_add_tail(&sbi->ll_list, &ll_super_blocks);
+	list_add_tail(&sbi->ll_list, &ll_super_blocks);
 	spin_unlock(&ll_sb_lock);
 
         sbi->ll_flags |= LL_SBI_VERBOSE;
@@ -155,7 +155,7 @@ void ll_free_sbi(struct super_block *sb)
 
 	if (sbi != NULL) {
 		spin_lock(&ll_sb_lock);
-		cfs_list_del(&sbi->ll_list);
+		list_del(&sbi->ll_list);
 		spin_unlock(&ll_sb_lock);
 		OBD_FREE(sbi, sizeof(*sbi));
 	}
@@ -699,7 +699,7 @@ void client_common_put_super(struct super_block *sb)
 
         cl_sb_fini(sb);
 
-        cfs_list_del(&sbi->ll_conn_chain);
+        list_del(&sbi->ll_conn_chain);
 
 	obd_fid_fini(sbi->ll_dt_exp->exp_obd);
         obd_disconnect(sbi->ll_dt_exp);
@@ -923,8 +923,8 @@ void ll_lli_init(struct ll_inode_info *lli)
 	mutex_init(&lli->lli_rmtperm_mutex);
         /* Do not set lli_fid, it has been initialized already. */
         fid_zero(&lli->lli_pfid);
-        CFS_INIT_LIST_HEAD(&lli->lli_close_list);
-        CFS_INIT_LIST_HEAD(&lli->lli_oss_capas);
+        INIT_LIST_HEAD(&lli->lli_close_list);
+        INIT_LIST_HEAD(&lli->lli_oss_capas);
         cfs_atomic_set(&lli->lli_open_count, 0);
         lli->lli_mds_capa = NULL;
         lli->lli_rmtperm_time = 0;
@@ -957,7 +957,7 @@ void ll_lli_init(struct ll_inode_info *lli)
 		mutex_init(&lli->lli_write_mutex);
 		init_rwsem(&lli->lli_glimpse_sem);
 		lli->lli_glimpse_time = 0;
-		CFS_INIT_LIST_HEAD(&lli->lli_agl_list);
+		INIT_LIST_HEAD(&lli->lli_agl_list);
 		lli->lli_agl_index = 0;
 		lli->lli_async_rc = 0;
 		lli->lli_volatile = false;
@@ -1246,7 +1246,7 @@ void ll_clear_inode(struct inode *inode)
 
         ll_clear_inode_capas(inode);
         if (!S_ISDIR(inode->i_mode))
-                LASSERT(cfs_list_empty(&lli->lli_agl_list));
+                LASSERT(list_empty(&lli->lli_agl_list));
 
         /*
          * XXX This has to be done before lsm is freed below, because

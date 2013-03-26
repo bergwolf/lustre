@@ -100,7 +100,7 @@ cfs_mem_cache_t *mem_cache_create(vm_size_t objsize, const char *name)
         LASSERT(cname != NULL);
         mc->mc_cache = zinit(objsize, (KMEM_MAX_ZONE * objsize), 0, strcpy(cname, name));
         mc->mc_size = objsize;
-        CFS_INIT_LIST_HEAD(&mc->mc_link);
+        INIT_LIST_HEAD(&mc->mc_link);
         strncpy(mc->mc_name, name, 1 + strlen(name));
         return mc;
 }
@@ -461,7 +461,7 @@ int cfs_mem_init(void)
 
                 nob = _MALLOC(sizeof(struct cfs_zone_nob), 
                               M_TEMP, M_WAITOK | M_ZERO);
-                CFS_INIT_LIST_HEAD(&nob->z_link);
+                INIT_LIST_HEAD(&nob->z_link);
                 nob->z_nob = &nob->z_link;
                 oid = cfs_alloc_sysctl_struct(NULL, OID_AUTO, CTLFLAG_RD | CTLFLAG_KERN, 
                                               "zone", nob, sizeof(struct cfs_zone_nob));
@@ -475,7 +475,7 @@ int cfs_mem_init(void)
         }
 	spin_lock_init(&cfs_zone_guard);
 #endif
-	CFS_INIT_LIST_HEAD(&page_death_row);
+	INIT_LIST_HEAD(&page_death_row);
 	spin_lock_init(&page_death_row_phylax);
 	raw_page_cache = cfs_mem_cache_create("raw-page", CFS_PAGE_SIZE, 0, 0);
 	return 0;

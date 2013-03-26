@@ -61,7 +61,7 @@ struct st_timer_data {
 	spinlock_t	 stt_lock;
         /* start time of the slot processed previously */
         cfs_time_t       stt_prev_slot;
-        cfs_list_t       stt_hash[STTIMER_NSLOTS];
+        struct list_head       stt_hash[STTIMER_NSLOTS];
         int              stt_shuttingdown;
 #ifdef __KERNEL__
         cfs_waitq_t      stt_waitq;
@@ -72,7 +72,7 @@ struct st_timer_data {
 void
 stt_add_timer(stt_timer_t *timer)
 {
-	cfs_list_t *pos;
+	struct list_head *pos;
 
 	spin_lock(&stt_data.stt_lock);
 
@@ -81,17 +81,17 @@ stt_add_timer(stt_timer_t *timer)
 #endif
         LASSERT (!stt_data.stt_shuttingdown);
         LASSERT (timer->stt_func != NULL);
-        LASSERT (cfs_list_empty(&timer->stt_list));
+        LASSERT (list_empty(&timer->stt_list));
         LASSERT (cfs_time_after(timer->stt_expires, cfs_time_current_sec()));
 
         /* a simple insertion sort */
-        cfs_list_for_each_prev (pos, STTIMER_SLOT(timer->stt_expires)) {
-                stt_timer_t *old = cfs_list_entry(pos, stt_timer_t, stt_list);
+        list_for_each_prev (pos, STTIMER_SLOT(timer->stt_expires)) {
+                stt_timer_t *old = list_entry(pos, stt_timer_t, stt_list);
 
                 if (cfs_time_aftereq(timer->stt_expires, old->stt_expires))
                         break;
         }
-        cfs_list_add(&timer->stt_list, pos);
+        list_add(&timer->stt_list, pos);
 
 	spin_unlock(&stt_data.stt_lock);
 }
@@ -117,9 +117,9 @@ stt_del_timer (stt_timer_t *timer)
 #endif
         LASSERT (!stt_data.stt_shuttingdown);
 
-        if (!cfs_list_empty(&timer->stt_list)) {
+        if (!list_empty(&timer->stt_list)) {
                 ret = 1;
-                cfs_list_del_init(&timer->stt_list);
+                list_del_init(&timer->stt_list);
         }
 
 	spin_unlock(&stt_data.stt_lock);
@@ -128,18 +128,18 @@ stt_del_timer (stt_timer_t *timer)
 
 /* called with stt_data.stt_lock held */
 int
-stt_expire_list (cfs_list_t *slot, cfs_time_t now)
+stt_expire_list (struct list_head *slot, cfs_time_t now)
 {
         int          expired = 0;
         stt_timer_t *timer;
 
-        while (!cfs_list_empty(slot)) {
-                timer = cfs_list_entry(slot->next, stt_timer_t, stt_list);
+        while (!list_empty(slot)) {
+                timer = list_entry(slot->next, stt_timer_t, stt_list);
 
                 if (cfs_time_after(timer->stt_expires, now))
                         break;
 
-                cfs_list_del_init(&timer->stt_list);
+                list_del_init(&timer->stt_list);
 		spin_unlock(&stt_data.stt_lock);
 
 		expired++;
@@ -244,7 +244,7 @@ stt_startup (void)
 
 	spin_lock_init(&stt_data.stt_lock);
         for (i = 0; i < STTIMER_NSLOTS; i++)
-                CFS_INIT_LIST_HEAD(&stt_data.stt_hash[i]);
+                INIT_LIST_HEAD(&stt_data.stt_hash[i]);
 
 #ifdef __KERNEL__
         stt_data.stt_nthreads = 0;
@@ -265,7 +265,7 @@ stt_shutdown (void)
 	spin_lock(&stt_data.stt_lock);
 
         for (i = 0; i < STTIMER_NSLOTS; i++)
-                LASSERT (cfs_list_empty(&stt_data.stt_hash[i]));
+                LASSERT (list_empty(&stt_data.stt_hash[i]));
 
         stt_data.stt_shuttingdown = 1;
 

@@ -377,7 +377,7 @@ void cfs_mem_cache_free(cfs_mem_cache_t * kmc, void * buf)
 }
 
 spinlock_t  shrinker_guard = {0};
-CFS_LIST_HEAD(shrinker_hdr);
+LIST_HEAD(shrinker_hdr);
 cfs_timer_t shrinker_timer = {0};
 
 struct cfs_shrinker * cfs_set_shrinker(int seeks, shrink_callback cb)
@@ -389,7 +389,7 @@ struct cfs_shrinker * cfs_set_shrinker(int seeks, shrink_callback cb)
 		s->seeks = seeks;
 		s->nr = 2;
 		spin_lock(&shrinker_guard);
-		cfs_list_add(&s->list, &shrinker_hdr);
+		list_add(&s->list, &shrinker_hdr);
 		spin_unlock(&shrinker_guard);
 	}
 
@@ -401,15 +401,14 @@ void cfs_remove_shrinker(struct cfs_shrinker *s)
 	struct cfs_shrinker *tmp;
 	spin_lock(&shrinker_guard);
 #if TRUE
-    cfs_list_for_each_entry_typed(tmp, &shrinker_hdr,
-                                  struct cfs_shrinker, list) {
+    list_for_each_entry(tmp, &shrinker_hdr, list) {
         if (tmp == s) {
-            cfs_list_del(&tmp->list);
+            list_del(&tmp->list);
             break;
         } 
     }
 #else
-    cfs_list_del(&s->list);
+    list_del(&s->list);
 #endif
 	spin_unlock(&shrinker_guard);
 	cfs_free(s);
@@ -421,8 +420,7 @@ void shrinker_timer_proc(ulong_ptr_t arg)
 	struct cfs_shrinker *s;
 	spin_lock(&shrinker_guard);
 
-	cfs_list_for_each_entry_typed(s, &shrinker_hdr,
-				      struct cfs_shrinker, list) {
+	list_for_each_entry(s, &shrinker_hdr, list) {
 		s->cb(s->nr, __GFP_FS);
 	}
 	spin_unlock(&shrinker_guard);

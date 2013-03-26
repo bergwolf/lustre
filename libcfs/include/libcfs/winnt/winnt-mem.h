@@ -234,7 +234,7 @@ struct cfs_shrinker {
 	int seeks;	/* seeks to recreate an obj */
 
 	/* These are for internal use */
-	cfs_list_t list;
+	struct list_head list;
 	long nr;	/* objs pending delete */
 };
 

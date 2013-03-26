@@ -138,7 +138,7 @@ cl_page_at_trusted(const struct cl_page *page,
 
         page = cl_page_top_trusted((struct cl_page *)page);
         do {
-                cfs_list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
+                list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
                         if (slice->cpl_obj->co_lu.lo_dev->ld_type == dtype)
                                 RETURN(slice);
                 }
@@ -278,7 +278,7 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
         struct cl_object *obj  = page->cp_obj;
 	int pagesize = cl_object_header(obj)->coh_page_bufsize;
 
-        PASSERT(env, page, cfs_list_empty(&page->cp_batch));
+        PASSERT(env, page, list_empty(&page->cp_batch));
         PASSERT(env, page, page->cp_owner == NULL);
         PASSERT(env, page, page->cp_req == NULL);
         PASSERT(env, page, page->cp_parent == NULL);
@@ -286,12 +286,12 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
 
         ENTRY;
         cfs_might_sleep();
-        while (!cfs_list_empty(&page->cp_layers)) {
+        while (!list_empty(&page->cp_layers)) {
                 struct cl_page_slice *slice;
 
-                slice = cfs_list_entry(page->cp_layers.next,
+                slice = list_entry(page->cp_layers.next,
                                        struct cl_page_slice, cpl_linkage);
-                cfs_list_del_init(page->cp_layers.next);
+                list_del_init(page->cp_layers.next);
                 slice->cpl_ops->cpo_fini(env, slice);
         }
 	CS_PAGE_DEC(obj, total);
@@ -335,13 +335,13 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
 		page->cp_index = ind;
 		cl_page_state_set_trust(page, CPS_CACHED);
 		page->cp_type = type;
-		CFS_INIT_LIST_HEAD(&page->cp_layers);
-		CFS_INIT_LIST_HEAD(&page->cp_batch);
-		CFS_INIT_LIST_HEAD(&page->cp_flight);
+		INIT_LIST_HEAD(&page->cp_layers);
+		INIT_LIST_HEAD(&page->cp_batch);
+		INIT_LIST_HEAD(&page->cp_flight);
 		mutex_init(&page->cp_mutex);
 		lu_ref_init(&page->cp_reference);
 		head = o->co_lu.lo_header;
-		cfs_list_for_each_entry(o, &head->loh_layers,
+		list_for_each_entry(o, &head->loh_layers,
 					co_lu.lo_linkage) {
 			if (o->co_ops->coo_page_init != NULL) {
 				result = o->co_ops->coo_page_init(env, o,
@@ -639,7 +639,7 @@ void cl_page_put(const struct lu_env *env, struct cl_page *page)
 
 		LASSERT(cfs_atomic_read(&page->cp_ref) == 0);
 		PASSERT(env, page, page->cp_owner == NULL);
-		PASSERT(env, page, cfs_list_empty(&page->cp_batch));
+		PASSERT(env, page, list_empty(&page->cp_batch));
 		/*
 		 * Page is no longer reachable by other threads. Tear
 		 * it down.
@@ -664,7 +664,7 @@ cfs_page_t *cl_page_vmpage(const struct lu_env *env, struct cl_page *page)
          */
         page = cl_page_top(page);
         do {
-                cfs_list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
+                list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
                         if (slice->cpl_ops->cpo_vmpage != NULL)
                                 RETURN(slice->cpl_ops->cpo_vmpage(env, slice));
                 }
@@ -742,7 +742,7 @@ EXPORT_SYMBOL(cl_page_at);
         __result = 0;                                                   \
         __page = cl_page_top(__page);                                   \
         do {                                                            \
-                cfs_list_for_each_entry(__scan, &__page->cp_layers,     \
+                list_for_each_entry(__scan, &__page->cp_layers,     \
                                         cpl_linkage) {                  \
                         __method = *(void **)((char *)__scan->cpl_ops + \
                                               __op);                    \
@@ -770,7 +770,7 @@ do {                                                                    \
                                                                         \
         __page = cl_page_top(__page);                                   \
         do {                                                            \
-                cfs_list_for_each_entry(__scan, &__page->cp_layers,     \
+                list_for_each_entry(__scan, &__page->cp_layers,     \
                                         cpl_linkage) {                  \
                         __method = *(void **)((char *)__scan->cpl_ops + \
                                               __op);                    \
@@ -794,7 +794,7 @@ do {                                                                        \
         while (__page->cp_child != NULL)                                    \
                 __page = __page->cp_child;                                  \
         do {                                                                \
-                cfs_list_for_each_entry_reverse(__scan, &__page->cp_layers, \
+                list_for_each_entry_reverse(__scan, &__page->cp_layers, \
                                                 cpl_linkage) {              \
                         __method = *(void **)((char *)__scan->cpl_ops +     \
                                               __op);                        \
@@ -1396,7 +1396,7 @@ int cl_page_cache_add(const struct lu_env *env, struct cl_io *io,
 	if (crt >= CRT_NR)
 		RETURN(-EINVAL);
 
-	cfs_list_for_each_entry(scan, &pg->cp_layers, cpl_linkage) {
+	list_for_each_entry(scan, &pg->cp_layers, cpl_linkage) {
 		if (scan->cpl_ops->io[crt].cpo_cache_add == NULL)
 			continue;
 
@@ -1613,7 +1613,7 @@ void cl_page_slice_add(struct cl_page *page, struct cl_page_slice *slice,
                        const struct cl_page_operations *ops)
 {
         ENTRY;
-        cfs_list_add_tail(&slice->cpl_linkage, &page->cp_layers);
+        list_add_tail(&slice->cpl_linkage, &page->cp_layers);
         slice->cpl_obj  = obj;
         slice->cpl_ops  = ops;
         slice->cpl_page = page;

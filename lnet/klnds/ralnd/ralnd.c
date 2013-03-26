@@ -181,15 +181,15 @@ int
 kranal_close_stale_conns_locked (kra_peer_t *peer, kra_conn_t *newconn)
 {
         kra_conn_t         *conn;
-        cfs_list_t         *ctmp;
-        cfs_list_t         *cnxt;
+        struct list_head         *ctmp;
+        struct list_head         *cnxt;
         int                 loopback;
         int                 count = 0;
 
         loopback = peer->rap_nid == kranal_data.kra_ni->ni_nid;
 
-        cfs_list_for_each_safe (ctmp, cnxt, &peer->rap_conns) {
-                conn = cfs_list_entry(ctmp, kra_conn_t, rac_list);
+        list_for_each_safe (ctmp, cnxt, &peer->rap_conns) {
+                conn = list_entry(ctmp, kra_conn_t, rac_list);
 
                 if (conn == newconn)
                         continue;
@@ -231,13 +231,13 @@ int
 kranal_conn_isdup_locked(kra_peer_t *peer, kra_conn_t *newconn)
 {
         kra_conn_t       *conn;
-        cfs_list_t       *tmp;
+        struct list_head       *tmp;
         int               loopback;
 
         loopback = peer->rap_nid == kranal_data.kra_ni->ni_nid;
 
-        cfs_list_for_each(tmp, &peer->rap_conns) {
-                conn = cfs_list_entry(tmp, kra_conn_t, rac_list);
+        list_for_each(tmp, &peer->rap_conns) {
+                conn = list_entry(tmp, kra_conn_t, rac_list);
 
                 /* 'newconn' is from an earlier version of 'peer'!!! */
                 if (newconn->rac_peerstamp < conn->rac_peerstamp)
@@ -305,12 +305,12 @@ kranal_create_conn(kra_conn_t **connp, kra_device_t *dev)
 
         memset(conn, 0, sizeof(*conn));
         cfs_atomic_set(&conn->rac_refcount, 1);
-        CFS_INIT_LIST_HEAD(&conn->rac_list);
-        CFS_INIT_LIST_HEAD(&conn->rac_hashlist);
-        CFS_INIT_LIST_HEAD(&conn->rac_schedlist);
-        CFS_INIT_LIST_HEAD(&conn->rac_fmaq);
-        CFS_INIT_LIST_HEAD(&conn->rac_rdmaq);
-        CFS_INIT_LIST_HEAD(&conn->rac_replyq);
+        INIT_LIST_HEAD(&conn->rac_list);
+        INIT_LIST_HEAD(&conn->rac_hashlist);
+        INIT_LIST_HEAD(&conn->rac_schedlist);
+        INIT_LIST_HEAD(&conn->rac_fmaq);
+        INIT_LIST_HEAD(&conn->rac_rdmaq);
+        INIT_LIST_HEAD(&conn->rac_replyq);
 	spin_lock_init(&conn->rac_lock);
 
         kranal_set_conn_uniqueness(conn);
@@ -339,13 +339,13 @@ kranal_destroy_conn(kra_conn_t *conn)
 
         LASSERT (!cfs_in_interrupt());
         LASSERT (!conn->rac_scheduled);
-        LASSERT (cfs_list_empty(&conn->rac_list));
-        LASSERT (cfs_list_empty(&conn->rac_hashlist));
-        LASSERT (cfs_list_empty(&conn->rac_schedlist));
+        LASSERT (list_empty(&conn->rac_list));
+        LASSERT (list_empty(&conn->rac_hashlist));
+        LASSERT (list_empty(&conn->rac_schedlist));
         LASSERT (cfs_atomic_read(&conn->rac_refcount) == 0);
-        LASSERT (cfs_list_empty(&conn->rac_fmaq));
-        LASSERT (cfs_list_empty(&conn->rac_rdmaq));
-        LASSERT (cfs_list_empty(&conn->rac_replyq));
+        LASSERT (list_empty(&conn->rac_fmaq));
+        LASSERT (list_empty(&conn->rac_rdmaq));
+        LASSERT (list_empty(&conn->rac_replyq));
 
         rrc = RapkDestroyRi(conn->rac_device->rad_handle,
                             conn->rac_rihandle);
@@ -363,11 +363,11 @@ kranal_terminate_conn_locked (kra_conn_t *conn)
 {
         LASSERT (!cfs_in_interrupt());
         LASSERT (conn->rac_state == RANAL_CONN_CLOSING);
-        LASSERT (!cfs_list_empty(&conn->rac_hashlist));
-        LASSERT (cfs_list_empty(&conn->rac_list));
+        LASSERT (!list_empty(&conn->rac_hashlist));
+        LASSERT (list_empty(&conn->rac_list));
 
         /* Remove from conn hash table: no new callbacks */
-        cfs_list_del_init(&conn->rac_hashlist);
+        list_del_init(&conn->rac_hashlist);
         kranal_conn_decref(conn);
 
         conn->rac_state = RANAL_CONN_CLOSED;
@@ -388,12 +388,12 @@ kranal_close_conn_locked (kra_conn_t *conn, int error)
 
         LASSERT (!cfs_in_interrupt());
         LASSERT (conn->rac_state == RANAL_CONN_ESTABLISHED);
-        LASSERT (!cfs_list_empty(&conn->rac_hashlist));
-        LASSERT (!cfs_list_empty(&conn->rac_list));
+        LASSERT (!list_empty(&conn->rac_hashlist));
+        LASSERT (!list_empty(&conn->rac_list));
 
-        cfs_list_del_init(&conn->rac_list);
+        list_del_init(&conn->rac_list);
 
-        if (cfs_list_empty(&peer->rap_conns) &&
+        if (list_empty(&peer->rap_conns) &&
             peer->rap_persistence == 0) {
                 /* Non-persistent peer with no more conns... */
                 kranal_unlink_peer_locked(peer);
@@ -449,7 +449,7 @@ kranal_set_conn_params(kra_conn_t *conn, kra_connreq_t *connreq,
         /* Schedule conn on rad_new_conns */
         kranal_conn_addref(conn);
 	spin_lock_irqsave(&dev->rad_lock, flags);
-        cfs_list_add_tail(&conn->rac_schedlist, &dev->rad_new_conns);
+        list_add_tail(&conn->rac_schedlist, &dev->rad_new_conns);
         cfs_waitq_signal(&dev->rad_waitq);
 	spin_unlock_irqrestore(&dev->rad_lock, flags);
 
@@ -733,8 +733,8 @@ kranal_conn_handshake (struct socket *sock, kra_peer_t *peer)
          * _don't_ have any blocked txs to complete with failure. */
         rc = kranal_conn_isdup_locked(peer, conn);
         if (rc != 0) {
-                LASSERT (!cfs_list_empty(&peer->rap_conns));
-                LASSERT (cfs_list_empty(&peer->rap_tx_queue));
+                LASSERT (!list_empty(&peer->rap_conns));
+                LASSERT (list_empty(&peer->rap_tx_queue));
 		write_unlock_irqrestore(&kranal_data.kra_global_lock,
                                             flags);
                 CWARN("Not creating duplicate connection to %s: %d\n",
@@ -745,7 +745,7 @@ kranal_conn_handshake (struct socket *sock, kra_peer_t *peer)
 
         if (new_peer) {
                 /* peer table takes my ref on the new peer */
-                cfs_list_add_tail(&peer->rap_list,
+                list_add_tail(&peer->rap_list,
                                   kranal_nid2peerlist(peer_nid));
         }
 
@@ -754,18 +754,18 @@ kranal_conn_handshake (struct socket *sock, kra_peer_t *peer)
 
         kranal_peer_addref(peer);               /* +1 ref for conn */
         conn->rac_peer = peer;
-        cfs_list_add_tail(&conn->rac_list, &peer->rap_conns);
+        list_add_tail(&conn->rac_list, &peer->rap_conns);
 
         kranal_conn_addref(conn);               /* +1 ref for conn table */
-        cfs_list_add_tail(&conn->rac_hashlist,
+        list_add_tail(&conn->rac_hashlist,
                           kranal_cqid2connlist(conn->rac_cqid));
 
         /* Schedule all packets blocking for a connection */
-        while (!cfs_list_empty(&peer->rap_tx_queue)) {
-                tx = cfs_list_entry(peer->rap_tx_queue.next,
+        while (!list_empty(&peer->rap_tx_queue)) {
+                tx = list_entry(peer->rap_tx_queue.next,
                                     kra_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 kranal_post_fma(conn, tx);
         }
 
@@ -800,7 +800,7 @@ kranal_connect (kra_peer_t *peer)
 {
         kra_tx_t          *tx;
         unsigned long      flags;
-        cfs_list_t         zombies;
+        struct list_head         zombies;
         int                rc;
 
         LASSERT (peer->rap_connecting);
@@ -821,7 +821,7 @@ kranal_connect (kra_peer_t *peer)
         if (rc == 0) {
                 /* kranal_conn_handshake() queues blocked txs immediately on
                  * success to avoid messages jumping the queue */
-                LASSERT (cfs_list_empty(&peer->rap_tx_queue));
+                LASSERT (list_empty(&peer->rap_tx_queue));
 
                 peer->rap_reconnect_interval = 0; /* OK to reconnect at any time */
 
@@ -842,24 +842,24 @@ kranal_connect (kra_peer_t *peer)
                 CFS_HZ;
 
         /* Grab all blocked packets while we have the global lock */
-        cfs_list_add(&zombies, &peer->rap_tx_queue);
-        cfs_list_del_init(&peer->rap_tx_queue);
+        list_add(&zombies, &peer->rap_tx_queue);
+        list_del_init(&peer->rap_tx_queue);
 
 	write_unlock_irqrestore(&kranal_data.kra_global_lock, flags);
 
-        if (cfs_list_empty(&zombies))
+        if (list_empty(&zombies))
                 return;
 
         CNETERR("Dropping packets for %s: connection failed\n",
                 libcfs_nid2str(peer->rap_nid));
 
         do {
-                tx = cfs_list_entry(zombies.next, kra_tx_t, tx_list);
+                tx = list_entry(zombies.next, kra_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 kranal_tx_done(tx, -EHOSTUNREACH);
 
-        } while (!cfs_list_empty(&zombies));
+        } while (!list_empty(&zombies));
 }
 
 void
@@ -892,7 +892,7 @@ kranal_accept (lnet_ni_t *ni, struct socket *sock)
 
 	spin_lock_irqsave(&kranal_data.kra_connd_lock, flags);
 
-        cfs_list_add_tail(&ras->ras_list, &kranal_data.kra_connd_acceptq);
+        list_add_tail(&ras->ras_list, &kranal_data.kra_connd_acceptq);
         cfs_waitq_signal(&kranal_data.kra_connd_waitq);
 
 	spin_unlock_irqrestore(&kranal_data.kra_connd_lock, flags);
@@ -916,10 +916,10 @@ kranal_create_peer (kra_peer_t **peerp, lnet_nid_t nid)
         peer->rap_nid = nid;
         cfs_atomic_set(&peer->rap_refcount, 1);     /* 1 ref for caller */
 
-        CFS_INIT_LIST_HEAD(&peer->rap_list);
-        CFS_INIT_LIST_HEAD(&peer->rap_connd_list);
-        CFS_INIT_LIST_HEAD(&peer->rap_conns);
-        CFS_INIT_LIST_HEAD(&peer->rap_tx_queue);
+        INIT_LIST_HEAD(&peer->rap_list);
+        INIT_LIST_HEAD(&peer->rap_connd_list);
+        INIT_LIST_HEAD(&peer->rap_conns);
+        INIT_LIST_HEAD(&peer->rap_tx_queue);
 
         peer->rap_reconnect_interval = 0;       /* OK to connect at any time */
 
@@ -953,9 +953,9 @@ kranal_destroy_peer (kra_peer_t *peer)
         LASSERT (peer->rap_persistence == 0);
         LASSERT (!kranal_peer_active(peer));
         LASSERT (!peer->rap_connecting);
-        LASSERT (cfs_list_empty(&peer->rap_conns));
-        LASSERT (cfs_list_empty(&peer->rap_tx_queue));
-        LASSERT (cfs_list_empty(&peer->rap_connd_list));
+        LASSERT (list_empty(&peer->rap_conns));
+        LASSERT (list_empty(&peer->rap_tx_queue));
+        LASSERT (list_empty(&peer->rap_connd_list));
 
         LIBCFS_FREE(peer, sizeof(*peer));
 
@@ -969,16 +969,16 @@ kranal_destroy_peer (kra_peer_t *peer)
 kra_peer_t *
 kranal_find_peer_locked (lnet_nid_t nid)
 {
-        cfs_list_t       *peer_list = kranal_nid2peerlist(nid);
-        cfs_list_t       *tmp;
+        struct list_head       *peer_list = kranal_nid2peerlist(nid);
+        struct list_head       *tmp;
         kra_peer_t       *peer;
 
-        cfs_list_for_each (tmp, peer_list) {
+        list_for_each (tmp, peer_list) {
 
-                peer = cfs_list_entry(tmp, kra_peer_t, rap_list);
+                peer = list_entry(tmp, kra_peer_t, rap_list);
 
                 LASSERT (peer->rap_persistence > 0 ||     /* persistent peer */
-                         !cfs_list_empty(&peer->rap_conns));  /* active conn */
+                         !list_empty(&peer->rap_conns));  /* active conn */
 
                 if (peer->rap_nid != nid)
                         continue;
@@ -1009,10 +1009,10 @@ void
 kranal_unlink_peer_locked (kra_peer_t *peer)
 {
         LASSERT (peer->rap_persistence == 0);
-        LASSERT (cfs_list_empty(&peer->rap_conns));
+        LASSERT (list_empty(&peer->rap_conns));
 
         LASSERT (kranal_peer_active(peer));
-        cfs_list_del_init(&peer->rap_list);
+        list_del_init(&peer->rap_list);
 
         /* lose peerlist's ref */
         kranal_peer_decref(peer);
@@ -1023,18 +1023,18 @@ kranal_get_peer_info (int index, lnet_nid_t *nidp, __u32 *ipp, int *portp,
                       int *persistencep)
 {
         kra_peer_t        *peer;
-        cfs_list_t        *ptmp;
+        struct list_head        *ptmp;
         int                i;
 
 	read_lock(&kranal_data.kra_global_lock);
 
         for (i = 0; i < kranal_data.kra_peer_hash_size; i++) {
 
-                cfs_list_for_each(ptmp, &kranal_data.kra_peers[i]) {
+                list_for_each(ptmp, &kranal_data.kra_peers[i]) {
 
-                        peer = cfs_list_entry(ptmp, kra_peer_t, rap_list);
+                        peer = list_entry(ptmp, kra_peer_t, rap_list);
                         LASSERT (peer->rap_persistence > 0 ||
-                                 !cfs_list_empty(&peer->rap_conns));
+                                 !list_empty(&peer->rap_conns));
 
                         if (index-- > 0)
                                 continue;
@@ -1076,7 +1076,7 @@ kranal_add_persistent_peer (lnet_nid_t nid, __u32 ip, int port)
                 peer = peer2;
         } else {
                 /* peer table takes existing ref on peer */
-                cfs_list_add_tail(&peer->rap_list,
+                list_add_tail(&peer->rap_list,
                               kranal_nid2peerlist(nid));
         }
 
@@ -1091,17 +1091,17 @@ kranal_add_persistent_peer (lnet_nid_t nid, __u32 ip, int port)
 void
 kranal_del_peer_locked (kra_peer_t *peer)
 {
-        cfs_list_t       *ctmp;
-        cfs_list_t       *cnxt;
+        struct list_head       *ctmp;
+        struct list_head       *cnxt;
         kra_conn_t       *conn;
 
         peer->rap_persistence = 0;
 
-        if (cfs_list_empty(&peer->rap_conns)) {
+        if (list_empty(&peer->rap_conns)) {
                 kranal_unlink_peer_locked(peer);
         } else {
-                cfs_list_for_each_safe(ctmp, cnxt, &peer->rap_conns) {
-                        conn = cfs_list_entry(ctmp, kra_conn_t, rac_list);
+                list_for_each_safe(ctmp, cnxt, &peer->rap_conns) {
+                        conn = list_entry(ctmp, kra_conn_t, rac_list);
 
                         kranal_close_conn_locked(conn, 0);
                 }
@@ -1113,8 +1113,8 @@ int
 kranal_del_peer (lnet_nid_t nid)
 {
         unsigned long      flags;
-        cfs_list_t        *ptmp;
-        cfs_list_t        *pnxt;
+        struct list_head        *ptmp;
+        struct list_head        *pnxt;
         kra_peer_t        *peer;
         int                lo;
         int                hi;
@@ -1131,10 +1131,10 @@ kranal_del_peer (lnet_nid_t nid)
         }
 
         for (i = lo; i <= hi; i++) {
-                cfs_list_for_each_safe (ptmp, pnxt, &kranal_data.kra_peers[i]) {
-                        peer = cfs_list_entry(ptmp, kra_peer_t, rap_list);
+                list_for_each_safe (ptmp, pnxt, &kranal_data.kra_peers[i]) {
+                        peer = list_entry(ptmp, kra_peer_t, rap_list);
                         LASSERT (peer->rap_persistence > 0 ||
-                                 !cfs_list_empty(&peer->rap_conns));
+                                 !list_empty(&peer->rap_conns));
 
                         if (!(nid == LNET_NID_ANY || peer->rap_nid == nid))
                                 continue;
@@ -1153,25 +1153,25 @@ kra_conn_t *
 kranal_get_conn_by_idx (int index)
 {
         kra_peer_t        *peer;
-        cfs_list_t        *ptmp;
+        struct list_head        *ptmp;
         kra_conn_t        *conn;
-        cfs_list_t        *ctmp;
+        struct list_head        *ctmp;
         int                i;
 
 	read_lock(&kranal_data.kra_global_lock);
 
         for (i = 0; i < kranal_data.kra_peer_hash_size; i++) {
-                cfs_list_for_each (ptmp, &kranal_data.kra_peers[i]) {
+                list_for_each (ptmp, &kranal_data.kra_peers[i]) {
 
-                        peer = cfs_list_entry(ptmp, kra_peer_t, rap_list);
+                        peer = list_entry(ptmp, kra_peer_t, rap_list);
                         LASSERT (peer->rap_persistence > 0 ||
-                                 !cfs_list_empty(&peer->rap_conns));
+                                 !list_empty(&peer->rap_conns));
 
-                        cfs_list_for_each (ctmp, &peer->rap_conns) {
+                        list_for_each (ctmp, &peer->rap_conns) {
                                 if (index-- > 0)
                                         continue;
 
-                                conn = cfs_list_entry(ctmp, kra_conn_t,
+                                conn = list_entry(ctmp, kra_conn_t,
                                                       rac_list);
                                 CDEBUG(D_NET, "++conn[%p] -> %s (%d)\n", conn,
                                        libcfs_nid2str(conn->rac_peer->rap_nid),
@@ -1191,12 +1191,12 @@ int
 kranal_close_peer_conns_locked (kra_peer_t *peer, int why)
 {
         kra_conn_t         *conn;
-        cfs_list_t         *ctmp;
-        cfs_list_t         *cnxt;
+        struct list_head         *ctmp;
+        struct list_head         *cnxt;
         int                 count = 0;
 
-        cfs_list_for_each_safe (ctmp, cnxt, &peer->rap_conns) {
-                conn = cfs_list_entry(ctmp, kra_conn_t, rac_list);
+        list_for_each_safe (ctmp, cnxt, &peer->rap_conns) {
+                conn = list_entry(ctmp, kra_conn_t, rac_list);
 
                 count++;
                 kranal_close_conn_locked(conn, why);
@@ -1210,8 +1210,8 @@ kranal_close_matching_conns (lnet_nid_t nid)
 {
         unsigned long       flags;
         kra_peer_t         *peer;
-        cfs_list_t         *ptmp;
-        cfs_list_t         *pnxt;
+        struct list_head         *ptmp;
+        struct list_head         *pnxt;
         int                 lo;
         int                 hi;
         int                 i;
@@ -1227,11 +1227,11 @@ kranal_close_matching_conns (lnet_nid_t nid)
         }
 
         for (i = lo; i <= hi; i++) {
-                cfs_list_for_each_safe (ptmp, pnxt, &kranal_data.kra_peers[i]) {
+                list_for_each_safe (ptmp, pnxt, &kranal_data.kra_peers[i]) {
 
-                        peer = cfs_list_entry(ptmp, kra_peer_t, rap_list);
+                        peer = list_entry(ptmp, kra_peer_t, rap_list);
                         LASSERT (peer->rap_persistence > 0 ||
-                                 !cfs_list_empty(&peer->rap_conns));
+                                 !list_empty(&peer->rap_conns));
 
                         if (!(nid == LNET_NID_ANY || nid == peer->rap_nid))
                                 continue;
@@ -1317,27 +1317,27 @@ kranal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
 }
 
 void
-kranal_free_txdescs(cfs_list_t *freelist)
+kranal_free_txdescs(struct list_head *freelist)
 {
         kra_tx_t    *tx;
 
-        while (!cfs_list_empty(freelist)) {
-                tx = cfs_list_entry(freelist->next, kra_tx_t, tx_list);
+        while (!list_empty(freelist)) {
+                tx = list_entry(freelist->next, kra_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 LIBCFS_FREE(tx->tx_phys, LNET_MAX_IOV * sizeof(*tx->tx_phys));
                 LIBCFS_FREE(tx, sizeof(*tx));
         }
 }
 
 int
-kranal_alloc_txdescs(cfs_list_t *freelist, int n)
+kranal_alloc_txdescs(struct list_head *freelist, int n)
 {
         int            i;
         kra_tx_t      *tx;
 
         LASSERT (freelist == &kranal_data.kra_idle_txs);
-        LASSERT (cfs_list_empty(freelist));
+        LASSERT (list_empty(freelist));
 
         for (i = 0; i < n; i++) {
 
@@ -1361,7 +1361,7 @@ kranal_alloc_txdescs(cfs_list_t *freelist, int n)
                 tx->tx_buftype = RANAL_BUF_NONE;
                 tx->tx_msg.ram_type = RANAL_MSG_NONE;
 
-                cfs_list_add(&tx->tx_list, freelist);
+                list_add(&tx->tx_list, freelist);
         }
 
         return 0;
@@ -1418,8 +1418,8 @@ kranal_device_init(int id, kra_device_t *dev)
 void
 kranal_device_fini(kra_device_t *dev)
 {
-        LASSERT (cfs_list_empty(&dev->rad_ready_conns));
-        LASSERT (cfs_list_empty(&dev->rad_new_conns));
+        LASSERT (list_empty(&dev->rad_ready_conns));
+        LASSERT (list_empty(&dev->rad_new_conns));
         LASSERT (dev->rad_nphysmap == 0);
         LASSERT (dev->rad_nppphysmap == 0);
         LASSERT (dev->rad_nvirtmap == 0);
@@ -1461,7 +1461,7 @@ kranal_shutdown (lnet_ni_t *ni)
                 /* Wait for pending conn reqs to be handled */
                 i = 2;
 		spin_lock_irqsave(&kranal_data.kra_connd_lock, flags);
-                while (!cfs_list_empty(&kranal_data.kra_connd_acceptq)) {
+                while (!list_empty(&kranal_data.kra_connd_acceptq)) {
 			spin_unlock_irqrestore(&kranal_data.kra_connd_lock,
                                                    flags);
                         i++;
@@ -1511,7 +1511,7 @@ kranal_shutdown (lnet_ni_t *ni)
         cfs_waitq_broadcast(&kranal_data.kra_reaper_waitq);
 	spin_unlock_irqrestore(&kranal_data.kra_reaper_lock, flags);
 
-        LASSERT (cfs_list_empty(&kranal_data.kra_connd_peers));
+        LASSERT (list_empty(&kranal_data.kra_connd_peers));
 	spin_lock_irqsave(&kranal_data.kra_connd_lock, flags);
         cfs_waitq_broadcast(&kranal_data.kra_connd_waitq);
 	spin_unlock_irqrestore(&kranal_data.kra_connd_lock, flags);
@@ -1529,20 +1529,20 @@ kranal_shutdown (lnet_ni_t *ni)
         LASSERT (cfs_atomic_read(&kranal_data.kra_npeers) == 0);
         if (kranal_data.kra_peers != NULL) {
                 for (i = 0; i < kranal_data.kra_peer_hash_size; i++)
-                        LASSERT (cfs_list_empty(&kranal_data.kra_peers[i]));
+                        LASSERT (list_empty(&kranal_data.kra_peers[i]));
 
                 LIBCFS_FREE(kranal_data.kra_peers,
-                            sizeof (cfs_list_t) *
+                            sizeof (struct list_head) *
                             kranal_data.kra_peer_hash_size);
         }
 
         LASSERT (cfs_atomic_read(&kranal_data.kra_nconns) == 0);
         if (kranal_data.kra_conns != NULL) {
                 for (i = 0; i < kranal_data.kra_conn_hash_size; i++)
-                        LASSERT (cfs_list_empty(&kranal_data.kra_conns[i]));
+                        LASSERT (list_empty(&kranal_data.kra_conns[i]));
 
                 LIBCFS_FREE(kranal_data.kra_conns,
-                            sizeof (cfs_list_t) *
+                            sizeof (struct list_head) *
                             kranal_data.kra_conn_hash_size);
         }
 
@@ -1612,8 +1612,8 @@ kranal_startup (lnet_ni_t *ni)
                 kra_device_t  *dev = &kranal_data.kra_devices[i];
 
                 dev->rad_idx = i;
-                CFS_INIT_LIST_HEAD(&dev->rad_ready_conns);
-                CFS_INIT_LIST_HEAD(&dev->rad_new_conns);
+                INIT_LIST_HEAD(&dev->rad_ready_conns);
+                INIT_LIST_HEAD(&dev->rad_new_conns);
                 cfs_waitq_init(&dev->rad_waitq);
 		spin_lock_init(&dev->rad_lock);
         }
@@ -1622,12 +1622,12 @@ kranal_startup (lnet_ni_t *ni)
         cfs_waitq_init(&kranal_data.kra_reaper_waitq);
 	spin_lock_init(&kranal_data.kra_reaper_lock);
 
-        CFS_INIT_LIST_HEAD(&kranal_data.kra_connd_acceptq);
-        CFS_INIT_LIST_HEAD(&kranal_data.kra_connd_peers);
+        INIT_LIST_HEAD(&kranal_data.kra_connd_acceptq);
+        INIT_LIST_HEAD(&kranal_data.kra_connd_peers);
         cfs_waitq_init(&kranal_data.kra_connd_waitq);
 	spin_lock_init(&kranal_data.kra_connd_lock);
 
-        CFS_INIT_LIST_HEAD(&kranal_data.kra_idle_txs);
+        INIT_LIST_HEAD(&kranal_data.kra_idle_txs);
 	spin_lock_init(&kranal_data.kra_tx_lock);
 
         /* OK to call kranal_api_shutdown() to cleanup now */
@@ -1636,23 +1636,23 @@ kranal_startup (lnet_ni_t *ni)
 
         kranal_data.kra_peer_hash_size = RANAL_PEER_HASH_SIZE;
         LIBCFS_ALLOC(kranal_data.kra_peers,
-                     sizeof(cfs_list_t) *
+                     sizeof(struct list_head) *
                             kranal_data.kra_peer_hash_size);
         if (kranal_data.kra_peers == NULL)
                 goto failed;
 
         for (i = 0; i < kranal_data.kra_peer_hash_size; i++)
-                CFS_INIT_LIST_HEAD(&kranal_data.kra_peers[i]);
+                INIT_LIST_HEAD(&kranal_data.kra_peers[i]);
 
         kranal_data.kra_conn_hash_size = RANAL_PEER_HASH_SIZE;
         LIBCFS_ALLOC(kranal_data.kra_conns,
-                     sizeof(cfs_list_t) *
+                     sizeof(struct list_head) *
                             kranal_data.kra_conn_hash_size);
         if (kranal_data.kra_conns == NULL)
                 goto failed;
 
         for (i = 0; i < kranal_data.kra_conn_hash_size; i++)
-                CFS_INIT_LIST_HEAD(&kranal_data.kra_conns[i]);
+                INIT_LIST_HEAD(&kranal_data.kra_conns[i]);
 
         rc = kranal_alloc_txdescs(&kranal_data.kra_idle_txs, 
                                   *kranal_tunables.kra_ntx);

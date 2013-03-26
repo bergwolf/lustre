@@ -506,7 +506,7 @@ struct ptlrpc_ctx_ops {
                                         PTLRPC_CTX_ERROR)
 
 struct ptlrpc_cli_ctx {
-        cfs_hlist_node_t        cc_cache;      /* linked into ctx cache */
+        struct hlist_node        cc_cache;      /* linked into ctx cache */
         cfs_atomic_t            cc_refcount;
         struct ptlrpc_sec      *cc_sec;
         struct ptlrpc_ctx_ops  *cc_ops;
@@ -515,8 +515,8 @@ struct ptlrpc_cli_ctx {
         unsigned long           cc_flags;
         struct vfs_cred         cc_vcred;
 	spinlock_t		cc_lock;
-        cfs_list_t              cc_req_list;   /* waiting reqs linked here */
-        cfs_list_t              cc_gc_chain;   /* linked to gc chain */
+        struct list_head              cc_req_list;   /* waiting reqs linked here */
+        struct list_head              cc_gc_chain;   /* linked to gc chain */
 };
 
 /**
@@ -834,7 +834,7 @@ struct ptlrpc_sec {
         /*
          * garbage collection
          */
-        cfs_list_t                      ps_gc_list;
+        struct list_head                      ps_gc_list;
         cfs_time_t                      ps_gc_interval; /* in seconds */
         cfs_time_t                      ps_gc_next;     /* in seconds */
 };

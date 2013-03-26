@@ -105,7 +105,7 @@ static int osc_io_submit(const struct lu_env *env,
         struct osc_object *osc  = NULL; /* to keep gcc happy */
         struct osc_page   *opg;
         struct cl_io      *io;
-	CFS_LIST_HEAD     (list);
+	LIST_HEAD     (list);
 
 	struct cl_page_list *qin      = &queue->c2_qin;
 	struct cl_page_list *qout     = &queue->c2_qout;
@@ -141,8 +141,8 @@ static int osc_io_submit(const struct lu_env *env,
                 oap = &opg->ops_oap;
 		LASSERT(osc == oap->oap_obj);
 
-		if (!cfs_list_empty(&oap->oap_pending_item) ||
-		    !cfs_list_empty(&oap->oap_rpc_item)) {
+		if (!list_empty(&oap->oap_pending_item) ||
+		    !list_empty(&oap->oap_rpc_item)) {
 			CDEBUG(D_CACHE, "Busy oap %p page %p for submit.\n",
 			       oap, opg);
                         result = -EBUSY;
@@ -168,7 +168,7 @@ static int osc_io_submit(const struct lu_env *env,
 		oap->oap_async_flags |= ASYNC_COUNT_STABLE;
 
 		osc_page_submit(env, opg, crt, brw_flags);
-		cfs_list_add_tail(&oap->oap_pending_item, &list);
+		list_add_tail(&oap->oap_pending_item, &list);
 		if (++queued == max_pages) {
 			queued = 0;
 			result = osc_queue_sync_pages(env, osc, &list, cmd,
@@ -359,7 +359,7 @@ static int trunc_check_cb(const struct lu_env *env, struct cl_io *io,
 	oap = &ops->ops_oap;
 
 	if (oap->oap_cmd & OBD_BRW_WRITE &&
-	    !cfs_list_empty(&oap->oap_pending_item))
+	    !list_empty(&oap->oap_pending_item))
 		CL_PAGE_DEBUG(D_ERROR, env, page, "exists " LPU64 "/%s.\n",
 				start, current->comm);
 
@@ -780,7 +780,7 @@ static void osc_req_attr_set(const struct lu_env *env,
         }
         if (flags & OBD_MD_FLHANDLE) {
                 clerq = slice->crs_req;
-                LASSERT(!cfs_list_empty(&clerq->crq_pages));
+                LASSERT(!list_empty(&clerq->crq_pages));
                 apage = container_of(clerq->crq_pages.next,
                                      struct cl_page, cp_flight);
                 opg = osc_cl_page_osc(apage);
@@ -791,7 +791,7 @@ static void osc_req_attr_set(const struct lu_env *env,
                         struct cl_lock          *scan;
 
                         head = cl_object_header(apage->cp_obj);
-                        cfs_list_for_each_entry(scan, &head->coh_locks,
+                        list_for_each_entry(scan, &head->coh_locks,
                                                 cll_linkage)
                                 CL_LOCK_DEBUG(D_ERROR, env, scan,
                                               "no cover page!\n");

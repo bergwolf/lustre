@@ -51,7 +51,6 @@
 #include <fcntl.h>
 #include <sys/uio.h>
 #endif
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "xtio.h"

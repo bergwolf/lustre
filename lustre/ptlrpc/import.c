@@ -250,13 +250,13 @@ ptlrpc_inflight_deadline(struct ptlrpc_request *req, time_t now)
 static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
 {
 	time_t now = cfs_time_current_sec();
-	cfs_list_t *tmp, *n;
+	struct list_head *tmp, *n;
 	struct ptlrpc_request *req;
 	unsigned int timeout = 0;
 
 	spin_lock(&imp->imp_lock);
-	cfs_list_for_each_safe(tmp, n, &imp->imp_sending_list) {
-		req = cfs_list_entry(tmp, struct ptlrpc_request, rq_list);
+	list_for_each_safe(tmp, n, &imp->imp_sending_list) {
+		req = list_entry(tmp, struct ptlrpc_request, rq_list);
 		timeout = max(ptlrpc_inflight_deadline(req, now), timeout);
 	}
 	spin_unlock(&imp->imp_lock);
@@ -271,7 +271,7 @@ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
  */
 void ptlrpc_invalidate_import(struct obd_import *imp)
 {
-        cfs_list_t *tmp, *n;
+        struct list_head *tmp, *n;
         struct ptlrpc_request *req;
         struct l_wait_info lwi;
         unsigned int timeout;
@@ -341,17 +341,17 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
                                  * this point. */
                                 rc = 0;
                         } else {
-                                cfs_list_for_each_safe(tmp, n,
+                                list_for_each_safe(tmp, n,
                                                        &imp->imp_sending_list) {
-                                        req = cfs_list_entry(tmp,
+                                        req = list_entry(tmp,
                                                              struct ptlrpc_request,
                                                              rq_list);
                                         DEBUG_REQ(D_ERROR, req,
                                                   "still on sending list");
                                 }
-                                cfs_list_for_each_safe(tmp, n,
+                                list_for_each_safe(tmp, n,
                                                        &imp->imp_delayed_list) {
-                                        req = cfs_list_entry(tmp,
+                                        req = list_entry(tmp,
                                                              struct ptlrpc_request,
                                                              rq_list);
                                         DEBUG_REQ(D_ERROR, req,
@@ -468,14 +468,14 @@ static int import_select_connection(struct obd_import *imp)
 
 	spin_lock(&imp->imp_lock);
 
-	if (cfs_list_empty(&imp->imp_conn_list)) {
+	if (list_empty(&imp->imp_conn_list)) {
 		CERROR("%s: no connections available\n",
 		       imp->imp_obd->obd_name);
 		spin_unlock(&imp->imp_lock);
 		RETURN(-EINVAL);
 	}
 
-        cfs_list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+        list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
                 CDEBUG(D_HA, "%s: connect to NID %s last attempt "LPU64"\n",
                        imp->imp_obd->obd_name,
                        libcfs_nid2str(conn->oic_conn->c_peer.nid),
@@ -570,12 +570,12 @@ static int import_select_connection(struct obd_import *imp)
 static int ptlrpc_first_transno(struct obd_import *imp, __u64 *transno)
 {
         struct ptlrpc_request *req;
-        cfs_list_t *tmp;
+        struct list_head *tmp;
 
-        if (cfs_list_empty(&imp->imp_replay_list))
+        if (list_empty(&imp->imp_replay_list))
                 return 0;
         tmp = imp->imp_replay_list.next;
-        req = cfs_list_entry(tmp, struct ptlrpc_request, rq_replay_list);
+        req = list_entry(tmp, struct ptlrpc_request, rq_replay_list);
         *transno = req->rq_transno;
         if (req->rq_transno == 0) {
                 DEBUG_REQ(D_ERROR, req, "zero transno in replay");
@@ -998,8 +998,8 @@ finish:
         } else {
 
 		spin_lock(&imp->imp_lock);
-		cfs_list_del(&imp->imp_conn_current->oic_item);
-		cfs_list_add(&imp->imp_conn_current->oic_item,
+		list_del(&imp->imp_conn_current->oic_item);
+		list_add(&imp->imp_conn_current->oic_item,
 			     &imp->imp_conn_list);
 		imp->imp_last_success_conn =
 			imp->imp_conn_current->oic_last_attempt;

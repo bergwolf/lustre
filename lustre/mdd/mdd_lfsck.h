@@ -227,10 +227,10 @@ struct lfsck_operations {
 
 struct lfsck_component {
 	/* into md_lfsck::ml_list_(scan,double_scan,idle} */
-	cfs_list_t		 lc_link;
+	struct list_head		 lc_link;
 
 	/* into md_lfsck::ml_list_dir */
-	cfs_list_t		 lc_link_dir;
+	struct list_head		 lc_link_dir;
 	struct rw_semaphore	 lc_sem;
 	cfs_atomic_t		 lc_ref;
 
@@ -253,18 +253,18 @@ struct md_lfsck {
 	spinlock_t		 ml_lock;
 
 	/* For the components in (first) scanning via otable-based iteration. */
-	cfs_list_t		 ml_list_scan;
+	struct list_head		 ml_list_scan;
 
 	/* For the components in scanning via directory traversal. Because
 	 * directory traversal cannot guarantee all the object be scanned,
 	 * so the component in the ml_list_dir must be in ml_list_scan. */
-	cfs_list_t		 ml_list_dir;
+	struct list_head		 ml_list_dir;
 
 	/* For the components in double scanning. */
-	cfs_list_t		 ml_list_double_scan;
+	struct list_head		 ml_list_double_scan;
 
 	/* For the components those are not scanning now. */
-	cfs_list_t		 ml_list_idle;
+	struct list_head		 ml_list_idle;
 
 	struct ptlrpc_thread	 ml_thread;
 

@@ -44,20 +44,19 @@
 
 #define DEBUG_SUBSYSTEM S_CLASS
 
-#include <libcfs/libcfs.h>
-
 #ifdef __KERNEL__
 # include <linux/module.h>
 #endif
 
 /* hash_long() */
-#include <libcfs/libcfs_hash.h>
 #include <obd_class.h>
 #include <obd_support.h>
 #include <lustre_disk.h>
 #include <lustre_fid.h>
 #include <lu_object.h>
-#include <libcfs/list.h>
+
+#include <libcfs/libcfs.h>
+#include <libcfs/libcfs_hash.h>
 
 static void lu_object_free(const struct lu_env *env, struct lu_object *o);
 
@@ -88,10 +87,10 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
 	if (fid_is_zero(fid)) {
 		LASSERT(top->loh_hash.next == NULL
 			&& top->loh_hash.pprev == NULL);
-		LASSERT(cfs_list_empty(&top->loh_lru));
+		LASSERT(list_empty(&top->loh_lru));
 		if (!cfs_atomic_dec_and_test(&top->loh_ref))
 			return;
-		cfs_list_for_each_entry_reverse(o, &top->loh_layers, lo_linkage) {
+		list_for_each_entry_reverse(o, &top->loh_layers, lo_linkage) {
 			if (o->lo_ops->loo_object_release != NULL)
 				o->lo_ops->loo_object_release(env, o);
 		}
@@ -120,14 +119,14 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
          * When last reference is released, iterate over object
          * layers, and notify them that object is no longer busy.
          */
-        cfs_list_for_each_entry_reverse(o, &top->loh_layers, lo_linkage) {
+        list_for_each_entry_reverse(o, &top->loh_layers, lo_linkage) {
                 if (o->lo_ops->loo_object_release != NULL)
                         o->lo_ops->loo_object_release(env, o);
         }
 
         if (!lu_object_is_dying(top)) {
-                LASSERT(cfs_list_empty(&top->loh_lru));
-                cfs_list_add_tail(&top->loh_lru, &bkt->lsb_lru);
+                LASSERT(list_empty(&top->loh_lru));
+                list_add_tail(&top->loh_lru, &bkt->lsb_lru);
                 cfs_hash_bd_unlock(site->ls_obj_hash, &bd, 1);
                 return;
         }
@@ -180,7 +179,7 @@ void lu_object_unhash(const struct lu_env *env, struct lu_object *o)
 		cfs_hash_bd_t bd;
 
 		cfs_hash_bd_get_and_lock(obj_hash, &top->loh_fid, &bd, 1);
-		cfs_list_del_init(&top->loh_lru);
+		list_del_init(&top->loh_lru);
 		cfs_hash_bd_del_locked(obj_hash, &bd, &top->loh_hash);
 		cfs_hash_bd_unlock(obj_hash, &bd, 1);
 	}
@@ -200,7 +199,7 @@ static struct lu_object *lu_object_alloc(const struct lu_env *env,
 {
         struct lu_object *scan;
         struct lu_object *top;
-        cfs_list_t *layers;
+        struct list_head *layers;
         int clean;
         int result;
         ENTRY;
@@ -226,7 +225,7 @@ static struct lu_object *lu_object_alloc(const struct lu_env *env,
                  * object slices are created.
                  */
                 clean = 1;
-                cfs_list_for_each_entry(scan, layers, lo_linkage) {
+                list_for_each_entry(scan, layers, lo_linkage) {
                         if (scan->lo_flags & LU_OBJECT_ALLOCATED)
                                 continue;
                         clean = 0;
@@ -240,7 +239,7 @@ static struct lu_object *lu_object_alloc(const struct lu_env *env,
                 }
         } while (!clean);
 
-        cfs_list_for_each_entry_reverse(scan, layers, lo_linkage) {
+        list_for_each_entry_reverse(scan, layers, lo_linkage) {
                 if (scan->lo_ops->loo_object_start != NULL) {
                         result = scan->lo_ops->loo_object_start(env, scan);
                         if (result != 0) {
@@ -262,8 +261,8 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
         struct lu_site_bkt_data *bkt;
         struct lu_site          *site;
         struct lu_object        *scan;
-        cfs_list_t              *layers;
-        cfs_list_t               splice;
+        struct list_head              *layers;
+        struct list_head               splice;
 
         site   = o->lo_dev->ld_site;
         layers = &o->lo_header->loh_layers;
@@ -271,7 +270,7 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
         /*
          * First call ->loo_object_delete() method to release all resources.
          */
-        cfs_list_for_each_entry_reverse(scan, layers, lo_linkage) {
+        list_for_each_entry_reverse(scan, layers, lo_linkage) {
                 if (scan->lo_ops->loo_object_delete != NULL)
                         scan->lo_ops->loo_object_delete(env, scan);
         }
@@ -282,16 +281,16 @@ static void lu_object_free(const struct lu_env *env, struct lu_object *o)
          * necessary, because lu_object_header is freed together with the
          * top-level slice.
          */
-        CFS_INIT_LIST_HEAD(&splice);
-        cfs_list_splice_init(layers, &splice);
-        while (!cfs_list_empty(&splice)) {
+        INIT_LIST_HEAD(&splice);
+        list_splice_init(layers, &splice);
+        while (!list_empty(&splice)) {
                 /*
                  * Free layers in bottom-to-top order, so that object header
                  * lives as long as possible and ->loo_object_free() methods
                  * can look at its contents.
                  */
                 o = container_of0(splice.prev, struct lu_object, lo_linkage);
-                cfs_list_del_init(&o->lo_linkage);
+                list_del_init(&o->lo_linkage);
                 LASSERT(o->lo_ops->loo_object_free != NULL);
                 o->lo_ops->loo_object_free(env, o);
         }
@@ -310,7 +309,7 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
         struct lu_site_bkt_data *bkt;
         cfs_hash_bd_t            bd;
         cfs_hash_bd_t            bd2;
-        cfs_list_t               dispose;
+        struct list_head               dispose;
         int                      did_sth;
         int                      start;
         int                      count;
@@ -320,7 +319,7 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
 	if (OBD_FAIL_CHECK(OBD_FAIL_OBD_NO_LRU))
 		RETURN(0);
 
-        CFS_INIT_LIST_HEAD(&dispose);
+        INIT_LIST_HEAD(&dispose);
         /*
          * Under LRU list lock, scan LRU list and move unreferenced objects to
          * the dispose list, removing them from LRU and hash table.
@@ -336,7 +335,7 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
                 cfs_hash_bd_lock(s->ls_obj_hash, &bd, 1);
                 bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, &bd);
 
-                cfs_list_for_each_entry_safe(h, temp, &bkt->lsb_lru, loh_lru) {
+                list_for_each_entry_safe(h, temp, &bkt->lsb_lru, loh_lru) {
                         LASSERT(cfs_atomic_read(&h->loh_ref) == 0);
 
                         cfs_hash_bd_get(s->ls_obj_hash, &h->loh_fid, &bd2);
@@ -344,7 +343,7 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
 
                         cfs_hash_bd_del_locked(s->ls_obj_hash,
                                                &bd2, &h->loh_hash);
-                        cfs_list_move(&h->loh_lru, &dispose);
+                        list_move(&h->loh_lru, &dispose);
                         if (did_sth == 0)
                                 did_sth = 1;
 
@@ -361,10 +360,10 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
                  * Free everything on the dispose list. This is safe against
                  * races due to the reasons described in lu_object_put().
                  */
-                while (!cfs_list_empty(&dispose)) {
+                while (!list_empty(&dispose)) {
                         h = container_of0(dispose.next,
                                           struct lu_object_header, loh_lru);
-                        cfs_list_del_init(&h->loh_lru);
+                        list_del_init(&h->loh_lru);
                         lu_object_free(env, lu_object_top(h));
                         lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
                 }
@@ -474,8 +473,8 @@ void lu_object_header_print(const struct lu_env *env, void *cookie,
         (*printer)(env, cookie, "header@%p[%#lx, %d, "DFID"%s%s%s]",
                    hdr, hdr->loh_flags, cfs_atomic_read(&hdr->loh_ref),
                    PFID(&hdr->loh_fid),
-                   cfs_hlist_unhashed(&hdr->loh_hash) ? "" : " hash",
-                   cfs_list_empty((cfs_list_t *)&hdr->loh_lru) ? \
+                   hlist_unhashed(&hdr->loh_hash) ? "" : " hash",
+                   list_empty((struct list_head *)&hdr->loh_lru) ? \
                    "" : " lru",
                    hdr->loh_attr & LOHA_EXISTS ? " exist":"");
 }
@@ -494,7 +493,7 @@ void lu_object_print(const struct lu_env *env, void *cookie,
         top = o->lo_header;
         lu_object_header_print(env, cookie, printer, top);
         (*printer)(env, cookie, "{ \n");
-        cfs_list_for_each_entry(o, &top->loh_layers, lo_linkage) {
+        list_for_each_entry(o, &top->loh_layers, lo_linkage) {
                 depth = o->lo_depth + 4;
 
                 /*
@@ -518,7 +517,7 @@ int lu_object_invariant(const struct lu_object *o)
         struct lu_object_header *top;
 
         top = o->lo_header;
-        cfs_list_for_each_entry(o, &top->loh_layers, lo_linkage) {
+        list_for_each_entry(o, &top->loh_layers, lo_linkage) {
                 if (o->lo_ops->loo_object_invariant != NULL &&
                     !o->lo_ops->loo_object_invariant(o))
                         return 0;
@@ -535,7 +534,7 @@ static struct lu_object *htable_lookup(struct lu_site *s,
 {
         struct lu_site_bkt_data *bkt;
         struct lu_object_header *h;
-        cfs_hlist_node_t        *hnode;
+        struct hlist_node        *hnode;
         __u64  ver = cfs_hash_bd_version_get(bd);
 
         if (*version == ver)
@@ -555,7 +554,7 @@ static struct lu_object *htable_lookup(struct lu_site *s,
         if (likely(!lu_object_is_dying(h))) {
 		cfs_hash_get(s->ls_obj_hash, hnode);
                 lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
-                cfs_list_del_init(&h->loh_lru);
+                list_del_init(&h->loh_lru);
                 return lu_object_top(h);
         }
 
@@ -738,24 +737,24 @@ EXPORT_SYMBOL(lu_object_find_slice);
 /**
  * Global list of all device types.
  */
-static CFS_LIST_HEAD(lu_device_types);
+static LIST_HEAD(lu_device_types);
 
 int lu_device_type_init(struct lu_device_type *ldt)
 {
 	int result = 0;
 
-	CFS_INIT_LIST_HEAD(&ldt->ldt_linkage);
+	INIT_LIST_HEAD(&ldt->ldt_linkage);
 	if (ldt->ldt_ops->ldto_init)
 		result = ldt->ldt_ops->ldto_init(ldt);
 	if (result == 0)
-		cfs_list_add(&ldt->ldt_linkage, &lu_device_types);
+		list_add(&ldt->ldt_linkage, &lu_device_types);
 	return result;
 }
 EXPORT_SYMBOL(lu_device_type_init);
 
 void lu_device_type_fini(struct lu_device_type *ldt)
 {
-	cfs_list_del_init(&ldt->ldt_linkage);
+	list_del_init(&ldt->ldt_linkage);
 	if (ldt->ldt_ops->ldto_fini)
 		ldt->ldt_ops->ldto_fini(ldt);
 }
@@ -765,7 +764,7 @@ void lu_types_stop(void)
 {
         struct lu_device_type *ldt;
 
-	cfs_list_for_each_entry(ldt, &lu_device_types, ldt_linkage) {
+	list_for_each_entry(ldt, &lu_device_types, ldt_linkage) {
 		if (ldt->ldt_device_nr == 0 && ldt->ldt_ops->ldto_stop)
 			ldt->ldt_ops->ldto_stop(ldt);
 	}
@@ -775,7 +774,7 @@ EXPORT_SYMBOL(lu_types_stop);
 /**
  * Global list of all sites on this node
  */
-static CFS_LIST_HEAD(lu_sites);
+static LIST_HEAD(lu_sites);
 static DEFINE_MUTEX(lu_sites_guard);
 
 /**
@@ -791,13 +790,13 @@ struct lu_site_print_arg {
 
 static int
 lu_site_obj_print(cfs_hash_t *hs, cfs_hash_bd_t *bd,
-                  cfs_hlist_node_t *hnode, void *data)
+                  struct hlist_node *hnode, void *data)
 {
         struct lu_site_print_arg *arg = (struct lu_site_print_arg *)data;
         struct lu_object_header  *h;
 
-        h = cfs_hlist_entry(hnode, struct lu_object_header, loh_hash);
-        if (!cfs_list_empty(&h->loh_layers)) {
+        h = hlist_entry(hnode, struct lu_object_header, loh_hash);
+        if (!list_empty(&h->loh_layers)) {
                 const struct lu_object *o;
 
                 o = lu_object_top(h);
@@ -895,32 +894,32 @@ static unsigned lu_obj_hop_hash(cfs_hash_t *hs,
         return hash & mask;
 }
 
-static void *lu_obj_hop_object(cfs_hlist_node_t *hnode)
+static void *lu_obj_hop_object(struct hlist_node *hnode)
 {
-        return cfs_hlist_entry(hnode, struct lu_object_header, loh_hash);
+        return hlist_entry(hnode, struct lu_object_header, loh_hash);
 }
 
-static void *lu_obj_hop_key(cfs_hlist_node_t *hnode)
+static void *lu_obj_hop_key(struct hlist_node *hnode)
 {
         struct lu_object_header *h;
 
-        h = cfs_hlist_entry(hnode, struct lu_object_header, loh_hash);
+        h = hlist_entry(hnode, struct lu_object_header, loh_hash);
         return &h->loh_fid;
 }
 
-static int lu_obj_hop_keycmp(const void *key, cfs_hlist_node_t *hnode)
+static int lu_obj_hop_keycmp(const void *key, struct hlist_node *hnode)
 {
         struct lu_object_header *h;
 
-        h = cfs_hlist_entry(hnode, struct lu_object_header, loh_hash);
+        h = hlist_entry(hnode, struct lu_object_header, loh_hash);
         return lu_fid_eq(&h->loh_fid, (struct lu_fid *)key);
 }
 
-static void lu_obj_hop_get(cfs_hash_t *hs, cfs_hlist_node_t *hnode)
+static void lu_obj_hop_get(cfs_hash_t *hs, struct hlist_node *hnode)
 {
         struct lu_object_header *h;
 
-        h = cfs_hlist_entry(hnode, struct lu_object_header, loh_hash);
+        h = hlist_entry(hnode, struct lu_object_header, loh_hash);
         if (cfs_atomic_add_return(1, &h->loh_ref) == 1) {
                 struct lu_site_bkt_data *bkt;
                 cfs_hash_bd_t            bd;
@@ -931,7 +930,7 @@ static void lu_obj_hop_get(cfs_hash_t *hs, cfs_hlist_node_t *hnode)
         }
 }
 
-static void lu_obj_hop_put_locked(cfs_hash_t *hs, cfs_hlist_node_t *hnode)
+static void lu_obj_hop_put_locked(cfs_hash_t *hs, struct hlist_node *hnode)
 {
         LBUG(); /* we should never called it */
 }
@@ -948,8 +947,8 @@ cfs_hash_ops_t lu_site_hash_ops = {
 void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d)
 {
 	spin_lock(&s->ls_ld_lock);
-	if (cfs_list_empty(&d->ld_linkage))
-		cfs_list_add(&d->ld_linkage, &s->ls_ld_linkage);
+	if (list_empty(&d->ld_linkage))
+		list_add(&d->ld_linkage, &s->ls_ld_linkage);
 	spin_unlock(&s->ls_ld_lock);
 }
 EXPORT_SYMBOL(lu_dev_add_linkage);
@@ -957,7 +956,7 @@ EXPORT_SYMBOL(lu_dev_add_linkage);
 void lu_dev_del_linkage(struct lu_site *s, struct lu_device *d)
 {
 	spin_lock(&s->ls_ld_lock);
-	cfs_list_del_init(&d->ld_linkage);
+	list_del_init(&d->ld_linkage);
 	spin_unlock(&s->ls_ld_lock);
 }
 EXPORT_SYMBOL(lu_dev_del_linkage);
@@ -1007,7 +1006,7 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
 
         cfs_hash_for_each_bucket(s->ls_obj_hash, &bd, i) {
                 bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, &bd);
-                CFS_INIT_LIST_HEAD(&bkt->lsb_lru);
+                INIT_LIST_HEAD(&bkt->lsb_lru);
                 cfs_waitq_init(&bkt->lsb_marche_funebre);
         }
 
@@ -1031,13 +1030,13 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
         lprocfs_counter_init(s->ls_stats, LU_SS_LRU_PURGED,
                              0, "lru_purged", "lru_purged");
 
-        CFS_INIT_LIST_HEAD(&s->ls_linkage);
+        INIT_LIST_HEAD(&s->ls_linkage);
         s->ls_top_dev = top;
         top->ld_site = s;
         lu_device_get(top);
         lu_ref_add(&top->ld_reference, "site-top", s);
 
-        CFS_INIT_LIST_HEAD(&s->ls_ld_linkage);
+        INIT_LIST_HEAD(&s->ls_ld_linkage);
 	spin_lock_init(&s->ls_ld_lock);
 
 	lu_dev_add_linkage(s, top);
@@ -1052,7 +1051,7 @@ EXPORT_SYMBOL(lu_site_init);
 void lu_site_fini(struct lu_site *s)
 {
 	mutex_lock(&lu_sites_guard);
-        cfs_list_del_init(&s->ls_linkage);
+        list_del_init(&s->ls_linkage);
 	mutex_unlock(&lu_sites_guard);
 
         if (s->ls_obj_hash != NULL) {
@@ -1081,7 +1080,7 @@ int lu_site_init_finish(struct lu_site *s)
 	mutex_lock(&lu_sites_guard);
         result = lu_context_refill(&lu_shrink_env.le_ctx);
         if (result == 0)
-                cfs_list_add(&s->ls_linkage, &lu_sites);
+                list_add(&s->ls_linkage, &lu_sites);
 	mutex_unlock(&lu_sites_guard);
         return result;
 }
@@ -1117,7 +1116,7 @@ int lu_device_init(struct lu_device *d, struct lu_device_type *t)
         cfs_atomic_set(&d->ld_ref, 0);
         d->ld_type = t;
         lu_ref_init(&d->ld_reference);
-        CFS_INIT_LIST_HEAD(&d->ld_linkage);
+        INIT_LIST_HEAD(&d->ld_linkage);
         return 0;
 }
 EXPORT_SYMBOL(lu_device_init);
@@ -1156,7 +1155,7 @@ int lu_object_init(struct lu_object *o,
         o->lo_dev    = d;
         lu_device_get(d);
         o->lo_dev_ref = lu_ref_add(&d->ld_reference, "lu_object", o);
-        CFS_INIT_LIST_HEAD(&o->lo_linkage);
+        INIT_LIST_HEAD(&o->lo_linkage);
         return 0;
 }
 EXPORT_SYMBOL(lu_object_init);
@@ -1168,7 +1167,7 @@ void lu_object_fini(struct lu_object *o)
 {
         struct lu_device *dev = o->lo_dev;
 
-        LASSERT(cfs_list_empty(&o->lo_linkage));
+        LASSERT(list_empty(&o->lo_linkage));
 
         if (dev != NULL) {
                 lu_ref_del_at(&dev->ld_reference,
@@ -1187,7 +1186,7 @@ EXPORT_SYMBOL(lu_object_fini);
  */
 void lu_object_add_top(struct lu_object_header *h, struct lu_object *o)
 {
-        cfs_list_move(&o->lo_linkage, &h->loh_layers);
+        list_move(&o->lo_linkage, &h->loh_layers);
 }
 EXPORT_SYMBOL(lu_object_add_top);
 
@@ -1199,7 +1198,7 @@ EXPORT_SYMBOL(lu_object_add_top);
  */
 void lu_object_add(struct lu_object *before, struct lu_object *o)
 {
-        cfs_list_move(&o->lo_linkage, &before->lo_linkage);
+        list_move(&o->lo_linkage, &before->lo_linkage);
 }
 EXPORT_SYMBOL(lu_object_add);
 
@@ -1210,9 +1209,9 @@ int lu_object_header_init(struct lu_object_header *h)
 {
         memset(h, 0, sizeof *h);
         cfs_atomic_set(&h->loh_ref, 1);
-        CFS_INIT_HLIST_NODE(&h->loh_hash);
-        CFS_INIT_LIST_HEAD(&h->loh_lru);
-        CFS_INIT_LIST_HEAD(&h->loh_layers);
+        INIT_HLIST_NODE(&h->loh_hash);
+        INIT_LIST_HEAD(&h->loh_lru);
+        INIT_LIST_HEAD(&h->loh_layers);
         lu_ref_init(&h->loh_reference);
         return 0;
 }
@@ -1223,9 +1222,9 @@ EXPORT_SYMBOL(lu_object_header_init);
  */
 void lu_object_header_fini(struct lu_object_header *h)
 {
-        LASSERT(cfs_list_empty(&h->loh_layers));
-        LASSERT(cfs_list_empty(&h->loh_lru));
-        LASSERT(cfs_hlist_unhashed(&h->loh_hash));
+        LASSERT(list_empty(&h->loh_layers));
+        LASSERT(list_empty(&h->loh_lru));
+        LASSERT(hlist_unhashed(&h->loh_hash));
         lu_ref_fini(&h->loh_reference);
 }
 EXPORT_SYMBOL(lu_object_header_fini);
@@ -1239,7 +1238,7 @@ struct lu_object *lu_object_locate(struct lu_object_header *h,
 {
         struct lu_object *o;
 
-        cfs_list_for_each_entry(o, &h->loh_layers, lo_linkage) {
+        list_for_each_entry(o, &h->loh_layers, lo_linkage) {
                 if (o->lo_dev->ld_type == dtype)
                         return o;
         }
@@ -1481,7 +1480,7 @@ EXPORT_SYMBOL(lu_context_key_get);
 /**
  * List of remembered contexts. XXX document me.
  */
-static CFS_LIST_HEAD(lu_context_remembered);
+static LIST_HEAD(lu_context_remembered);
 
 /**
  * Destroy \a key in all remembered contexts. This is used to destroy key
@@ -1501,7 +1500,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
                  * XXX memory barrier has to go here.
                  */
 		spin_lock(&lu_keys_guard);
-		cfs_list_for_each_entry(ctx, &lu_context_remembered,
+		list_for_each_entry(ctx, &lu_context_remembered,
 					lc_remember)
 			key_fini(ctx, key->lct_index);
 		spin_unlock(&lu_keys_guard);
@@ -1596,10 +1595,10 @@ int lu_context_init(struct lu_context *ctx, __u32 tags)
 	ctx->lc_tags = tags;
 	if (tags & LCT_REMEMBER) {
 		spin_lock(&lu_keys_guard);
-		cfs_list_add(&ctx->lc_remember, &lu_context_remembered);
+		list_add(&ctx->lc_remember, &lu_context_remembered);
 		spin_unlock(&lu_keys_guard);
 	} else {
-		CFS_INIT_LIST_HEAD(&ctx->lc_remember);
+		INIT_LIST_HEAD(&ctx->lc_remember);
 	}
 
 	rc = keys_init(ctx);
@@ -1619,13 +1618,13 @@ void lu_context_fini(struct lu_context *ctx)
 	ctx->lc_state = LCS_FINALIZED;
 
 	if ((ctx->lc_tags & LCT_REMEMBER) == 0) {
-		LASSERT(cfs_list_empty(&ctx->lc_remember));
+		LASSERT(list_empty(&ctx->lc_remember));
 		keys_fini(ctx);
 
 	} else { /* could race with key degister */
 		spin_lock(&lu_keys_guard);
 		keys_fini(ctx);
-		cfs_list_del_init(&ctx->lc_remember);
+		list_del_init(&ctx->lc_remember);
 		spin_unlock(&lu_keys_guard);
 	}
 }
@@ -1799,7 +1798,7 @@ static void lu_site_stats_get(cfs_hash_t *hs,
 
         cfs_hash_for_each_bucket(hs, &bd, i) {
                 struct lu_site_bkt_data *bkt = cfs_hash_bd_extra_get(hs, &bd);
-                cfs_hlist_head_t        *hhead;
+                struct hlist_head        *hhead;
 
                 cfs_hash_bd_lock(hs, &bd, 1);
                 stats->lss_busy  += bkt->lsb_busy;
@@ -1812,7 +1811,7 @@ static void lu_site_stats_get(cfs_hash_t *hs,
                 }
 
                 cfs_hash_bd_for_each_hlist(hs, &bd, hhead) {
-                        if (!cfs_hlist_empty(hhead))
+                        if (!hlist_empty(hhead))
                                 stats->lss_populated++;
                 }
                 cfs_hash_bd_unlock(hs, &bd, 1);
@@ -1846,7 +1845,7 @@ static int lu_cache_shrink(SHRINKER_ARGS(sc, nr_to_scan, gfp_mask))
         struct lu_site *tmp;
         int cached = 0;
         int remain = shrink_param(sc, nr_to_scan);
-        CFS_LIST_HEAD(splice);
+        LIST_HEAD(splice);
 
 	if (!(shrink_param(sc, gfp_mask) & __GFP_FS)) {
 		if (remain != 0)
@@ -1869,14 +1868,14 @@ static int lu_cache_shrink(SHRINKER_ARGS(sc, nr_to_scan, gfp_mask))
 	CDEBUG(D_INODE, "Shrink %d objects\n", remain);
 
 	mutex_lock(&lu_sites_guard);
-        cfs_list_for_each_entry_safe(s, tmp, &lu_sites, ls_linkage) {
+        list_for_each_entry_safe(s, tmp, &lu_sites, ls_linkage) {
                 if (shrink_param(sc, nr_to_scan) != 0) {
                         remain = lu_site_purge(&lu_shrink_env, s, remain);
                         /*
                          * Move just shrunk site to the tail of site list to
                          * assure shrinking fairness.
                          */
-                        cfs_list_move_tail(&s->ls_linkage, &splice);
+                        list_move_tail(&s->ls_linkage, &splice);
                 }
 
                 memset(&stats, 0, sizeof(stats));
@@ -1885,7 +1884,7 @@ static int lu_cache_shrink(SHRINKER_ARGS(sc, nr_to_scan, gfp_mask))
                 if (shrink_param(sc, nr_to_scan) && remain <= 0)
                         break;
         }
-        cfs_list_splice(&splice, lu_sites.prev);
+        list_splice(&splice, lu_sites.prev);
 	mutex_unlock(&lu_sites_guard);
 
         cached = (cached / 100) * sysctl_vfs_cache_pressure;

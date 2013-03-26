@@ -778,7 +778,7 @@ static int lprocfs_wr_nosquash_nids(struct file *file, const char *buffer,
         struct mdt_device *mdt = mdt_dev(obd->obd_lu_dev);
         int rc;
         char *kernbuf, *errmsg;
-        cfs_list_t tmp;
+        struct list_head tmp;
         ENTRY;
 
         OBD_ALLOC(kernbuf, count + 1);
@@ -795,7 +795,7 @@ static int lprocfs_wr_nosquash_nids(struct file *file, const char *buffer,
         if (!strcmp(kernbuf, "NONE") || !strcmp(kernbuf, "clear")) {
                 /* empty string is special case */
 		down_write(&mdt->mdt_squash_sem);
-                if (!cfs_list_empty(&mdt->mdt_nosquash_nids)) {
+                if (!list_empty(&mdt->mdt_nosquash_nids)) {
                         cfs_free_nidlist(&mdt->mdt_nosquash_nids);
                         OBD_FREE(mdt->mdt_nosquash_str,
                                  mdt->mdt_nosquash_strlen);
@@ -809,20 +809,20 @@ static int lprocfs_wr_nosquash_nids(struct file *file, const char *buffer,
                 RETURN(count);
         }
 
-        CFS_INIT_LIST_HEAD(&tmp);
+        INIT_LIST_HEAD(&tmp);
         if (cfs_parse_nidlist(kernbuf, count, &tmp) <= 0) {
                 errmsg = "can't parse";
                 GOTO(failed, rc = -EINVAL);
         }
 
 	down_write(&mdt->mdt_squash_sem);
-        if (!cfs_list_empty(&mdt->mdt_nosquash_nids)) {
+        if (!list_empty(&mdt->mdt_nosquash_nids)) {
                 cfs_free_nidlist(&mdt->mdt_nosquash_nids);
                 OBD_FREE(mdt->mdt_nosquash_str, mdt->mdt_nosquash_strlen);
         }
         mdt->mdt_nosquash_str = kernbuf;
         mdt->mdt_nosquash_strlen = count + 1;
-        cfs_list_splice(&tmp, &mdt->mdt_nosquash_nids);
+        list_splice(&tmp, &mdt->mdt_nosquash_nids);
 
         LCONSOLE_INFO("%s: nosquash_nids is set to %s\n",
                       obd->obd_name, kernbuf);
@@ -879,7 +879,7 @@ static int lprocfs_wr_mdt_som(struct file *file, const char *buffer,
         }
 
         /* 1 stands for self export. */
-        cfs_list_for_each_entry(exp, &obd->obd_exports, exp_obd_chain) {
+        list_for_each_entry(exp, &obd->obd_exports, exp_obd_chain) {
                 if (exp == obd->obd_self_export)
                         continue;
 		if (exp_connect_flags(exp) & OBD_CONNECT_MDS_MDS)

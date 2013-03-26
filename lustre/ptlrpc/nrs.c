@@ -50,13 +50,7 @@
 #include <libcfs/libcfs.h>
 #include "ptlrpc_internal.h"
 
-/* XXX: This is just for liblustre. Remove the #if defined directive when the
- * "cfs_" prefix is dropped from cfs_list_head. */
-#if defined (__linux__) && defined(__KERNEL__)
 extern struct list_head ptlrpc_all_services;
-#else
-extern struct cfs_list_head ptlrpc_all_services;
-#endif
 
 /**
  * NRS core object.
@@ -102,7 +96,7 @@ nrs_policy_stop0(struct ptlrpc_nrs_policy *policy)
 		spin_lock(&nrs->nrs_lock);
 	}
 
-	LASSERT(cfs_list_empty(&policy->pol_list_queued));
+	LASSERT(list_empty(&policy->pol_list_queued));
 	LASSERT(policy->pol_req_queued == 0 &&
 		policy->pol_req_started == 0);
 
@@ -335,7 +329,7 @@ nrs_policy_find_locked(struct ptlrpc_nrs *nrs, char *name)
 {
 	struct ptlrpc_nrs_policy *tmp;
 
-	cfs_list_for_each_entry(tmp, &(nrs)->nrs_policy_list, pol_list) {
+	list_for_each_entry(tmp, &(nrs)->nrs_policy_list, pol_list) {
 		if (strncmp(tmp->pol_name, name, NRS_POL_NAME_MAX) == 0) {
 			nrs_policy_get_locked(tmp);
 			return tmp;
@@ -752,7 +746,7 @@ nrs_policy_unregister(struct ptlrpc_nrs *nrs, char *name)
 		LASSERT(policy->pol_state == NRS_POL_STATE_STOPPED);
 	}
 
-	cfs_list_del(&policy->pol_list);
+	list_del(&policy->pol_list);
 	nrs->nrs_num_pols--;
 
 	nrs_policy_put_locked(policy);
@@ -807,8 +801,8 @@ nrs_policy_register(struct ptlrpc_nrs *nrs,
 			      NRS_POL_STATE_UNAVAIL : NRS_POL_STATE_STOPPED;
 	policy->pol_flags   = desc->pd_flags & ~PTLRPC_NRS_FL_REG_EXTERN;
 
-	CFS_INIT_LIST_HEAD(&policy->pol_list);
-	CFS_INIT_LIST_HEAD(&policy->pol_list_queued);
+	INIT_LIST_HEAD(&policy->pol_list);
+	INIT_LIST_HEAD(&policy->pol_list_queued);
 
 	rc = nrs_policy_init(policy);
 	if (rc != 0) {
@@ -832,7 +826,7 @@ nrs_policy_register(struct ptlrpc_nrs *nrs,
 		RETURN(-EEXIST);
 	}
 
-	cfs_list_add_tail(&policy->pol_list, &nrs->nrs_policy_list);
+	list_add_tail(&policy->pol_list, &nrs->nrs_policy_list);
 	nrs->nrs_num_pols++;
 
 	if (policy->pol_flags & PTLRPC_NRS_FL_REG_START)
@@ -868,8 +862,8 @@ ptlrpc_nrs_req_add_nolock(struct ptlrpc_request *req)
 	 * Add the policy to the NRS head's list of policies with enqueued
 	 * requests, if it has not been added there.
 	 */
-	if (cfs_list_empty(&policy->pol_list_queued))
-		cfs_list_add_tail(&policy->pol_list_queued,
+	if (list_empty(&policy->pol_list_queued))
+		list_add_tail(&policy->pol_list_queued,
 				  &policy->pol_nrs->nrs_policy_queued);
 }
 
@@ -946,7 +940,7 @@ nrs_register_policies_locked(struct ptlrpc_nrs *nrs)
 
 	LASSERT(mutex_is_locked(&nrs_core.nrs_mutex));
 
-	cfs_list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
+	list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
 		if (nrs_policy_compatible(svc, desc)) {
 			rc = nrs_policy_register(nrs, desc);
 			if (rc != 0) {
@@ -994,11 +988,11 @@ nrs_svcpt_setup_locked0(struct ptlrpc_nrs *nrs,
 	nrs->nrs_svcpt = svcpt;
 	nrs->nrs_queue_type = queue;
 	spin_lock_init(&nrs->nrs_lock);
-	CFS_INIT_LIST_HEAD(&nrs->nrs_heads);
-	CFS_INIT_LIST_HEAD(&nrs->nrs_policy_list);
-	CFS_INIT_LIST_HEAD(&nrs->nrs_policy_queued);
+	INIT_LIST_HEAD(&nrs->nrs_heads);
+	INIT_LIST_HEAD(&nrs->nrs_policy_list);
+	INIT_LIST_HEAD(&nrs->nrs_policy_queued);
 
-	cfs_list_add_tail(&nrs->nrs_heads, &nrs_core.nrs_heads);
+	list_add_tail(&nrs->nrs_heads, &nrs_core.nrs_heads);
 
 	rc = nrs_register_policies_locked(nrs);
 
@@ -1074,13 +1068,13 @@ again:
 	nrs = nrs_svcpt2nrs(svcpt, hp);
 	nrs->nrs_stopping = 1;
 
-	cfs_list_for_each_entry_safe(policy, tmp, &nrs->nrs_policy_list,
+	list_for_each_entry_safe(policy, tmp, &nrs->nrs_policy_list,
 				     pol_list) {
 		rc = nrs_policy_unregister(nrs, policy->pol_name);
 		LASSERT(rc == 0);
 	}
 
-	cfs_list_del(&nrs->nrs_heads);
+	list_del(&nrs->nrs_heads);
 
 	/**
 	 * If the service partition has an HP NRS head, clean that up as well.
@@ -1111,7 +1105,7 @@ nrs_policy_exists_locked(const struct ptlrpc_nrs_pol_desc *desc)
 	struct ptlrpc_nrs_pol_desc     *tmp;
 	ENTRY;
 
-	cfs_list_for_each_entry(tmp, &nrs_core.nrs_policies, pd_list) {
+	list_for_each_entry(tmp, &nrs_core.nrs_policies, pd_list) {
 		if (strncmp(tmp->pd_name, desc->pd_name, NRS_POL_NAME_MAX) == 0)
 			RETURN(true);
 	}
@@ -1137,7 +1131,7 @@ nrs_policy_unregister_locked(struct ptlrpc_nrs_pol_desc *desc)
 
 	LASSERT(mutex_is_locked(&nrs_core.nrs_mutex));
 
-	cfs_list_for_each_entry(nrs, &nrs_core.nrs_heads, nrs_heads) {
+	list_for_each_entry(nrs, &nrs_core.nrs_heads, nrs_heads) {
 		if (!nrs_policy_compatible(nrs->nrs_svcpt->scp_service, desc)) {
 			/**
 			 * The policy may only have registered on compatible
@@ -1215,7 +1209,7 @@ nrs_pol_make_available_locked(struct ptlrpc_nrs_pol_desc *desc)
 	  * Cycle through all registered instances of the policy and place them
 	  * at the STOPPED state.
 	  */
-	cfs_list_for_each_entry(nrs, &nrs_core.nrs_heads, nrs_heads) {
+	list_for_each_entry(nrs, &nrs_core.nrs_heads, nrs_heads) {
 		if (!nrs_policy_compatible(nrs->nrs_svcpt->scp_service, desc))
 			continue;
 		nrs_pol_make_available0(nrs, desc->pd_name);
@@ -1276,7 +1270,7 @@ ptlrpc_nrs_policy_register(struct ptlrpc_nrs_pol_desc *desc)
 	 */
 	mutex_lock(&ptlrpc_all_services_mutex);
 
-	cfs_list_for_each_entry(svc, &ptlrpc_all_services, srv_list) {
+	list_for_each_entry(svc, &ptlrpc_all_services, srv_list) {
 
 		if (unlikely(svc->srv_is_stopping)) {
 			mutex_unlock(&ptlrpc_all_services_mutex);
@@ -1339,7 +1333,7 @@ again:
 	 */
 	nrs_pol_make_available_locked(desc);
 
-	cfs_list_add_tail(&desc->pd_list, &nrs_core.nrs_policies);
+	list_add_tail(&desc->pd_list, &nrs_core.nrs_policies);
 fail:
 	mutex_unlock(&nrs_core.nrs_mutex);
 
@@ -1393,7 +1387,7 @@ ptlrpc_nrs_policy_unregister(struct ptlrpc_nrs_pol_desc *desc)
 	CDEBUG(D_INFO, "Unregistering policy %s from NRS core.\n",
 	       desc->pd_name);
 
-	cfs_list_del(&desc->pd_list);
+	list_del(&desc->pd_list);
 
 	/**
 	 * Unregister the policy's lprocfs interface from all compatible
@@ -1401,7 +1395,7 @@ ptlrpc_nrs_policy_unregister(struct ptlrpc_nrs_pol_desc *desc)
 	 */
 	mutex_lock(&ptlrpc_all_services_mutex);
 
-	cfs_list_for_each_entry(svc, &ptlrpc_all_services, srv_list) {
+	list_for_each_entry(svc, &ptlrpc_all_services, srv_list) {
 		if (!nrs_policy_compatible(svc, desc))
 			continue;
 
@@ -1454,7 +1448,7 @@ ptlrpc_service_nrs_setup(struct ptlrpc_service *svc)
 	 * Set up lprocfs interfaces for all supported policies for the
 	 * service.
 	 */
-	cfs_list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
+	list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
 		if (!nrs_policy_compatible(svc, desc))
 			continue;
 
@@ -1496,7 +1490,7 @@ ptlrpc_service_nrs_cleanup(struct ptlrpc_service *svc)
 	 * Clean up lprocfs interfaces for all supported policies for the
 	 * service.
 	 */
-	cfs_list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
+	list_for_each_entry(desc, &nrs_core.nrs_policies, pd_list) {
 		if (!nrs_policy_compatible(svc, desc))
 			continue;
 
@@ -1616,7 +1610,7 @@ ptlrpc_nrs_req_poll_nolock(struct ptlrpc_service_part *svcpt, bool hp)
 	 * Always try to drain requests from all NRS polices even if they are
 	 * inactive, because the user can change policy status at runtime.
 	 */
-	cfs_list_for_each_entry(policy, &(nrs)->nrs_policy_queued,
+	list_for_each_entry(policy, &(nrs)->nrs_policy_queued,
 				pol_list_queued) {
 		nrq = nrs_request_poll(policy);
 		if (likely(nrq != NULL))
@@ -1649,7 +1643,7 @@ ptlrpc_nrs_req_del_nolock(struct ptlrpc_request *req)
 	 * ptlrpc_nrs::nrs_policy_queued.
 	 */
 	if (policy->pol_req_queued == 0) {
-		cfs_list_del_init(&policy->pol_list_queued);
+		list_del_init(&policy->pol_list_queued);
 
 		/**
 		 * If there are other policies with queued requests, move the
@@ -1660,7 +1654,7 @@ ptlrpc_nrs_req_del_nolock(struct ptlrpc_request *req)
 		LASSERT(policy->pol_req_queued <
 			policy->pol_nrs->nrs_req_queued);
 
-		cfs_list_move_tail(&policy->pol_list_queued,
+		list_move_tail(&policy->pol_list_queued,
 				   &policy->pol_nrs->nrs_policy_queued);
 	}
 }
@@ -1828,8 +1822,8 @@ ptlrpc_nrs_init(void)
 	 * Initialize the NRS core object.
 	 */
 	mutex_init(&nrs_core.nrs_mutex);
-	CFS_INIT_LIST_HEAD(&nrs_core.nrs_heads);
-	CFS_INIT_LIST_HEAD(&nrs_core.nrs_policies);
+	INIT_LIST_HEAD(&nrs_core.nrs_heads);
+	INIT_LIST_HEAD(&nrs_core.nrs_policies);
 
 	for (i = 0; i < ARRAY_SIZE(nrs_pols_builtin); i++) {
 		/**
@@ -1841,7 +1835,7 @@ ptlrpc_nrs_init(void)
 		 * This should not fail for in-tree policies.
 		 */
 		LASSERT(rc == false);
-		cfs_list_add_tail(&nrs_pols_builtin[i]->pd_list,
+		list_add_tail(&nrs_pols_builtin[i]->pd_list,
 				  &nrs_core.nrs_policies);
 	}
 

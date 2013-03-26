@@ -1836,7 +1836,7 @@ static void ost_prolong_locks(struct ost_prolong_data *data)
 
 
 	spin_lock_bh(&exp->exp_bl_list_lock);
-        cfs_list_for_each_entry(lock, &exp->exp_bl_list, l_exp_list) {
+        list_for_each_entry(lock, &exp->exp_bl_list, l_exp_list) {
                 LASSERT(lock->l_flags & LDLM_FL_AST_SENT);
                 LASSERT(lock->l_resource->lr_type == LDLM_EXTENT);
 

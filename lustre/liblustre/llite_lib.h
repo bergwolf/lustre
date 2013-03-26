@@ -37,7 +37,6 @@
 #ifndef __LLU_H_
 #define __LLU_H_
 #include <fcntl.h>
-#include <sys/queue.h>
 #include <sysio.h>
 #ifdef HAVE_XTIO_H
 #include <xtio.h>
@@ -79,7 +78,7 @@ struct llu_sb_info {
         struct lu_fid            ll_root_fid;
         int                      ll_flags;
         struct lustre_client_ocd ll_lco;
-        cfs_list_t               ll_conn_chain;
+        struct list_head               ll_conn_chain;
 
         struct obd_uuid          ll_mds_uuid;
         struct obd_uuid          ll_mds_peer_uuid;

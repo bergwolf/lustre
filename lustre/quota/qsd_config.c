@@ -39,7 +39,7 @@
 
 #include "qsd_internal.h"
 
-static CFS_LIST_HEAD(qfs_list);
+static LIST_HEAD(qfs_list);
 /* protect the qfs_list */
 static DEFINE_SPINLOCK(qfs_list_lock);
 
@@ -57,8 +57,8 @@ void qsd_put_fsinfo(struct qsd_fsinfo *qfs)
 	LASSERT(qfs->qfs_ref > 0);
 	qfs->qfs_ref--;
 	if (qfs->qfs_ref == 0) {
-		LASSERT(cfs_list_empty(&qfs->qfs_qsd_list));
-		cfs_list_del(&qfs->qfs_link);
+		LASSERT(list_empty(&qfs->qfs_qsd_list));
+		list_del(&qfs->qfs_link);
 		OBD_FREE_PTR(qfs);
 	}
 	spin_unlock(&qfs_list_lock);
@@ -93,14 +93,14 @@ struct qsd_fsinfo *qsd_get_fsinfo(char *name, bool create)
 			RETURN(NULL);
 
 		sema_init(&new->qfs_sem, 1);
-		CFS_INIT_LIST_HEAD(&new->qfs_qsd_list);
+		INIT_LIST_HEAD(&new->qfs_qsd_list);
 		strcpy(new->qfs_name, name);
 		new->qfs_ref = 1;
 	}
 
 	/* search in the fsinfo list */
 	spin_lock(&qfs_list_lock);
-	cfs_list_for_each_entry(qfs, &qfs_list, qfs_link) {
+	list_for_each_entry(qfs, &qfs_list, qfs_link) {
 		if (!strcmp(qfs->qfs_name, name)) {
 			qfs->qfs_ref++;
 			goto out;
@@ -111,7 +111,7 @@ struct qsd_fsinfo *qsd_get_fsinfo(char *name, bool create)
 
 	if (new) {
 		/* not found, but we were asked to create a new one */
-		cfs_list_add_tail(&new->qfs_link, &qfs_list);
+		list_add_tail(&new->qfs_link, &qfs_list);
 		qfs = new;
 		new = NULL;
 	}
@@ -179,7 +179,7 @@ int qsd_process_config(struct lustre_cfg *lcfg)
 		struct qsd_instance	*qsd;
 		struct qsd_qtype_info	*qqi;
 
-		cfs_list_for_each_entry(qsd, &qfs->qfs_qsd_list, qsd_link) {
+		list_for_each_entry(qsd, &qfs->qfs_qsd_list, qsd_link) {
 			bool	skip = false;
 			int	type;
 

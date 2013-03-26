@@ -520,7 +520,7 @@ static struct thandle *lod_trans_create(const struct lu_env *env,
 	if (IS_ERR(th))
 		return th;
 
-	CFS_INIT_LIST_HEAD(&th->th_remote_update_list);
+	INIT_LIST_HEAD(&th->th_remote_update_list);
 	return th;
 }
 
@@ -531,10 +531,10 @@ static int lod_remote_sync(const struct lu_env *env, struct dt_device *dev,
 	int    rc = 0;
 	ENTRY;
 
-	if (cfs_list_empty(&th->th_remote_update_list))
+	if (list_empty(&th->th_remote_update_list))
 		RETURN(0);
 
-	cfs_list_for_each_entry(update, &th->th_remote_update_list,
+	list_for_each_entry(update, &th->th_remote_update_list,
 				ur_list) {
 		/* In DNE phase I, there should be only one OSP
 		 * here, so we will do send/receive one by one,
@@ -573,7 +573,7 @@ static int lod_trans_stop(const struct lu_env *env, struct thandle *th)
 	int rc = 0;
 	int rc2 = 0;
 
-	cfs_list_for_each_entry_safe(update, tmp,
+	list_for_each_entry_safe(update, tmp,
 				     &th->th_remote_update_list,
 				     ur_list) {
 		th->th_current_request = update;

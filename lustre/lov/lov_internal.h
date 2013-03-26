@@ -52,7 +52,7 @@ struct lov_request {
         struct obd_info          rq_oi;
         struct lov_request_set  *rq_rqset;
 
-        cfs_list_t               rq_link;
+        struct list_head               rq_link;
 
         int                      rq_idx;        /* index in lov->tgts array */
         int                      rq_stripe;     /* stripe number */
@@ -82,7 +82,7 @@ struct lov_request_set {
 	obd_count			set_oabufs;
 	struct brw_page			*set_pga;
 	struct lov_lock_handles		*set_lockh;
-	cfs_list_t			set_list;
+	struct list_head			set_list;
 	cfs_waitq_t			set_waitq;
 	spinlock_t			set_lock;
 };

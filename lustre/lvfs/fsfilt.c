@@ -42,15 +42,15 @@
 #include <libcfs/libcfs.h>
 #include <lustre_fsfilt.h>
 
-CFS_LIST_HEAD(fsfilt_types);
+LIST_HEAD(fsfilt_types);
 
 static struct fsfilt_operations *fsfilt_search_type(const char *type)
 {
         struct fsfilt_operations *found;
-        cfs_list_t *p;
+        struct list_head *p;
 
-        cfs_list_for_each(p, &fsfilt_types) {
-                found = cfs_list_entry(p, struct fsfilt_operations, fs_list);
+        list_for_each(p, &fsfilt_types) {
+                found = list_entry(p, struct fsfilt_operations, fs_list);
                 if (!strcmp(found->fs_type, type)) {
                         return found;
                 }
@@ -72,7 +72,7 @@ int fsfilt_register_ops(struct fsfilt_operations *fs_ops)
                 }
         } else {
                 PORTAL_MODULE_USE;
-                cfs_list_add(&fs_ops->fs_list, &fsfilt_types);
+                list_add(&fs_ops->fs_list, &fsfilt_types);
         }
 
         /* unlock fsfilt_types list */
@@ -82,15 +82,15 @@ EXPORT_SYMBOL(fsfilt_register_ops);
 
 void fsfilt_unregister_ops(struct fsfilt_operations *fs_ops)
 {
-        cfs_list_t *p;
+        struct list_head *p;
 
         /* lock fsfilt_types list */
-        cfs_list_for_each(p, &fsfilt_types) {
+        list_for_each(p, &fsfilt_types) {
                 struct fsfilt_operations *found;
 
-                found = cfs_list_entry(p, typeof(*found), fs_list);
+                found = list_entry(p, typeof(*found), fs_list);
                 if (found == fs_ops) {
-                        cfs_list_del(p);
+                        list_del(p);
                         PORTAL_MODULE_UNUSE;
                         break;
                 }

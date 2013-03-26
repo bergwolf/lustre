@@ -38,6 +38,7 @@
  * Lustre Light common routines
  */
 
+#include <lnet/lnetctl.h>     /* needed for parse_dump */
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -47,7 +48,6 @@
 #include <sys/queue.h>
 
 #include <liblustre.h>
-#include <lnet/lnetctl.h>     /* needed for parse_dump */
 #include <lustre_log.h>
 
 #include "lutil.h"

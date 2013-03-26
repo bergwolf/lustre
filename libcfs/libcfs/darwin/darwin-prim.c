@@ -136,7 +136,7 @@ cfs_symbol_register(const char *name, const void *value)
         strncpy(new->name, name, CFS_SYMBOL_LEN);
         new->value = (void *)value;
         new->ref = 0;
-        CFS_INIT_LIST_HEAD(&new->sym_list);
+        INIT_LIST_HEAD(&new->sym_list);
 
         down_write(&cfs_symbol_lock);
         list_for_each(walker, &cfs_symbol_list) {
@@ -179,7 +179,7 @@ cfs_symbol_unregister(const char *name)
 void
 cfs_symbol_init()
 {
-        CFS_INIT_LIST_HEAD(&cfs_symbol_list);
+        INIT_LIST_HEAD(&cfs_symbol_list);
         init_rwsem(&cfs_symbol_lock);
 }
 

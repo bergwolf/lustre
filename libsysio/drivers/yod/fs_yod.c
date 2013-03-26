@@ -64,7 +64,6 @@
 #include <sys/statvfs.h>
 #endif
 #include <utime.h>
-#include <sys/queue.h>
 
 #include "xtio.h"
 #include "sysio.h"

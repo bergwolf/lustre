@@ -52,7 +52,7 @@
  */
 struct mgs_nidtbl;
 struct mgs_nidtbl_target {
-        cfs_list_t              mnt_list;
+        struct list_head              mnt_list;
         struct mgs_nidtbl      *mnt_fs;
         u64                     mnt_version;
         int                     mnt_type; /* OST or MDT */
@@ -86,11 +86,11 @@ struct mgs_fsc {
          * list of fs clients from the same export,
          * protected by mgs_export_data->med_lock
          */
-        cfs_list_t         mfc_export_list;
+        struct list_head         mfc_export_list;
         /**
          * list of fs clients in the same fsdb, protected by fsdb->fsdb_mutex
          */
-        cfs_list_t        mfc_fsdb_list;
+        struct list_head        mfc_fsdb_list;
         unsigned          mfc_ir_capable:1;
 };
 
@@ -100,7 +100,7 @@ struct mgs_nidtbl {
 	struct mutex	mn_lock;
         u64           mn_version;
         int           mn_nr_targets;
-        cfs_list_t    mn_targets;
+        struct list_head    mn_targets;
 };
 
 struct mgs_tgt_srpc_conf {
@@ -120,7 +120,7 @@ struct mgs_tgt_srpc_conf {
 
 struct fs_db {
         char              fsdb_name[9];
-        cfs_list_t        fsdb_list;           /* list of databases */
+        struct list_head        fsdb_list;           /* list of databases */
 	struct mutex	  fsdb_mutex;
         void             *fsdb_ost_index_map;  /* bitmap of used indicies */
         void             *fsdb_mdt_index_map;  /* bitmap of used indicies */
@@ -135,7 +135,7 @@ struct fs_db {
         struct mgs_tgt_srpc_conf *fsdb_srpc_tgt;
 
         /* list of fs clients, mgs_fsc. protected by mgs_mutex */
-        cfs_list_t           fsdb_clients;
+        struct list_head           fsdb_clients;
         int                  fsdb_nonir_clients;
         int                  fsdb_ir_state;
 
@@ -163,7 +163,7 @@ struct mgs_device {
 	struct obd_export		*mgs_bottom_exp;
 	struct dt_object		*mgs_configs_dir;
 	struct dt_object		*mgs_nidtbl_dir;
-	cfs_list_t			 mgs_fs_db_list;
+	struct list_head			 mgs_fs_db_list;
 	spinlock_t			 mgs_lock; /* covers mgs_fs_db_list */
 	cfs_proc_dir_entry_t		*mgs_proc_live;
 	cfs_proc_dir_entry_t            *mgs_proc_osd;
@@ -360,7 +360,7 @@ static inline struct dt_object *dt_object_child(struct dt_object *o)
 			     struct dt_object, do_lu);
 }
 struct mgs_direntry {
-	cfs_list_t  list;
+	struct list_head  list;
 	char	   *name;
 	int	    len;
 };
@@ -395,6 +395,6 @@ static inline struct mgs_direntry *mgs_direntry_alloc(int len)
 
 /* mgs_llog.c */
 int class_dentry_readdir(const struct lu_env *env, struct mgs_device *mgs,
-			 cfs_list_t *list);
+			 struct list_head *list);
 
 #endif /* _MGS_INTERNAL_H */

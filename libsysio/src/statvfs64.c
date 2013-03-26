@@ -47,7 +47,6 @@
 #include <assert.h>
 #include <sys/vfs.h>
 #include <sys/types.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "inode.h"

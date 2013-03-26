@@ -51,6 +51,7 @@
 # include <linux/pagemap.h>
 # include <linux/rbtree.h>
 #else /* __KERNEL__ */
+#include <liblustre.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -59,7 +60,6 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 #include <fcntl.h>
-# include <liblustre.h>
 #endif
 
 #include <obd.h>
@@ -387,7 +387,7 @@ int ccc_object_init(const struct lu_env *env, struct lu_object *obj,
                 const struct cl_object_conf *cconf;
 
                 cconf = lu2cl_conf(conf);
-                CFS_INIT_LIST_HEAD(&vob->cob_pending_list);
+                INIT_LIST_HEAD(&vob->cob_pending_list);
                 lu_object_add(obj, below);
                 result = ccc_object_init0(env, vob, cconf);
         } else

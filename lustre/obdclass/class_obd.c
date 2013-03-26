@@ -57,7 +57,7 @@ cfs_atomic_t libcfs_kmemory = {0};
 
 struct obd_device *obd_devs[MAX_OBD_DEVICES];
 EXPORT_SYMBOL(obd_devs);
-cfs_list_t obd_types;
+struct list_head obd_types;
 DEFINE_RWLOCK(obd_dev_lock);
 
 __u64 obd_max_pages = 0;
@@ -536,7 +536,7 @@ int init_obdclass(void)
         int lustre_register_fs(void);
 
         for (i = CAPA_SITE_CLIENT; i < CAPA_SITE_MAX; i++)
-                CFS_INIT_LIST_HEAD(&capa_list[i]);
+                INIT_LIST_HEAD(&capa_list[i]);
 #endif
 
         LCONSOLE_INFO("Lustre: Build Version: "BUILD_VERSION"\n");
@@ -568,7 +568,7 @@ int init_obdclass(void)
         if (err)
                 return err;
 
-        CFS_INIT_LIST_HEAD(&obd_types);
+        INIT_LIST_HEAD(&obd_types);
 
         err = cfs_psdev_register(&obd_psdev);
         if (err) {

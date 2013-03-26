@@ -41,6 +41,7 @@
  * lee@sandia.gov
  */
 
+#include <sys/queue.h>
 #if defined(AUTOMOUNT_FILE_NAME) && !defined(MAX_MOUNT_DEPTH)
 /*
  * Maximum number of automounts to attempt in path traversal.

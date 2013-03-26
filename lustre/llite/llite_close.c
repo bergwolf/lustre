@@ -53,8 +53,8 @@ void vvp_write_pending(struct ccc_object *club, struct ccc_page *page)
 	ENTRY;
 	spin_lock(&lli->lli_lock);
 	lli->lli_flags |= LLIF_SOM_DIRTY;
-	if (page != NULL && cfs_list_empty(&page->cpg_pending_linkage))
-		cfs_list_add(&page->cpg_pending_linkage,
+	if (page != NULL && list_empty(&page->cpg_pending_linkage))
+		list_add(&page->cpg_pending_linkage,
 			     &club->cob_pending_list);
 	spin_unlock(&lli->lli_lock);
 	EXIT;
@@ -68,8 +68,8 @@ void vvp_write_complete(struct ccc_object *club, struct ccc_page *page)
 
 	ENTRY;
 	spin_lock(&lli->lli_lock);
-	if (page != NULL && !cfs_list_empty(&page->cpg_pending_linkage)) {
-		cfs_list_del_init(&page->cpg_pending_linkage);
+	if (page != NULL && !list_empty(&page->cpg_pending_linkage)) {
+		list_del_init(&page->cpg_pending_linkage);
 		rc = 1;
 	}
 	spin_unlock(&lli->lli_lock);
@@ -91,7 +91,7 @@ void ll_queue_done_writing(struct inode *inode, unsigned long flags)
         lli->lli_flags |= flags;
 
         if ((lli->lli_flags & LLIF_DONE_WRITING) &&
-            cfs_list_empty(&club->cob_pending_list)) {
+            list_empty(&club->cob_pending_list)) {
                 struct ll_close_queue *lcq = ll_i2sbi(inode)->ll_lcq;
 
                 if (lli->lli_flags & LLIF_MDS_SIZE_LOCK)
@@ -102,10 +102,10 @@ void ll_queue_done_writing(struct inode *inode, unsigned long flags)
                 /* DONE_WRITING is allowed and inode has no dirty page. */
 		spin_lock(&lcq->lcq_lock);
 
-                LASSERT(cfs_list_empty(&lli->lli_close_list));
+                LASSERT(list_empty(&lli->lli_close_list));
                 CDEBUG(D_INODE, "adding inode %lu/%u to close list\n",
                        inode->i_ino, inode->i_generation);
-                cfs_list_add_tail(&lli->lli_close_list, &lcq->lcq_head);
+                list_add_tail(&lli->lli_close_list, &lcq->lcq_head);
 
                 /* Avoid a concurrent insertion into the close thread queue:
                  * an inode is already in the close thread, open(), write(),
@@ -152,7 +152,7 @@ void ll_ioepoch_close(struct inode *inode, struct md_op_data *op_data,
 	ENTRY;
 
 	spin_lock(&lli->lli_lock);
-	if (!(cfs_list_empty(&club->cob_pending_list))) {
+	if (!(list_empty(&club->cob_pending_list))) {
 		if (!(lli->lli_flags & LLIF_EPOCH_PENDING)) {
 			LASSERT(*och != NULL);
 			LASSERT(lli->lli_pending_och == NULL);
@@ -204,7 +204,7 @@ void ll_ioepoch_close(struct inode *inode, struct md_op_data *op_data,
 		}
 	}
 
-	LASSERT(cfs_list_empty(&club->cob_pending_list));
+	LASSERT(list_empty(&club->cob_pending_list));
 	lli->lli_flags &= ~LLIF_SOM_DIRTY;
 	spin_unlock(&lli->lli_lock);
 	ll_done_writing_attr(inode, op_data);
@@ -333,10 +333,10 @@ static struct ll_inode_info *ll_close_next_lli(struct ll_close_queue *lcq)
 
 	spin_lock(&lcq->lcq_lock);
 
-        if (!cfs_list_empty(&lcq->lcq_head)) {
-                lli = cfs_list_entry(lcq->lcq_head.next, struct ll_inode_info,
+        if (!list_empty(&lcq->lcq_head)) {
+                lli = list_entry(lcq->lcq_head.next, struct ll_inode_info,
                                      lli_close_list);
-                cfs_list_del_init(&lli->lli_close_list);
+                list_del_init(&lli->lli_close_list);
         } else if (cfs_atomic_read(&lcq->lcq_stop))
                 lli = ERR_PTR(-EALREADY);
 
@@ -387,7 +387,7 @@ int ll_close_thread_start(struct ll_close_queue **lcq_ret)
 		return -ENOMEM;
 
 	spin_lock_init(&lcq->lcq_lock);
-	CFS_INIT_LIST_HEAD(&lcq->lcq_head);
+	INIT_LIST_HEAD(&lcq->lcq_head);
 	cfs_waitq_init(&lcq->lcq_waitq);
 	init_completion(&lcq->lcq_comp);
 

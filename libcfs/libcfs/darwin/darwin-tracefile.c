@@ -120,7 +120,7 @@ struct trace_cpu_data *trace_get_tcd(void)
 		cfs_enter_debugger();
 	}
 	tcd = &trace_data[0].tcd;
-        CFS_INIT_LIST_HEAD(&pages);
+        INIT_LIST_HEAD(&pages);
 	if (get_preemption_level() == 0)
 		nr_pages = trace_refill_stock(tcd, CFS_ALLOC_STD, &pages);
 	else

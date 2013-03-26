@@ -484,7 +484,7 @@ ksocknal_lib_send_iov (ksock_conn_t *conn, ksock_tx_t *tx)
                         nob += scratchiov[i].iov_len;
                 }
 
-                if (!cfs_list_empty(&conn->ksnc_tx_queue) ||
+                if (!list_empty(&conn->ksnc_tx_queue) ||
                     nob < tx->tx_resid)
                         msg.msg_flags |= MSG_MORE;
 
@@ -519,7 +519,7 @@ ksocknal_lib_send_kiov (ksock_conn_t *conn, ksock_tx_t *tx)
                 CDEBUG(D_NET, "page %p + offset %x for %d\n",
                                page, offset, kiov->kiov_len);
 
-                if (!cfs_list_empty(&conn->ksnc_tx_queue) ||
+                if (!list_empty(&conn->ksnc_tx_queue) ||
                     fragsize < tx->tx_resid)
                         msgflg |= MSG_MORE;
 
@@ -560,7 +560,7 @@ ksocknal_lib_send_kiov (ksock_conn_t *conn, ksock_tx_t *tx)
                         nob += scratchiov[i].iov_len = kiov[i].kiov_len;
                 }
 
-                if (!cfs_list_empty(&conn->ksnc_tx_queue) ||
+                if (!list_empty(&conn->ksnc_tx_queue) ||
                     nob < tx->tx_resid)
                         msg.msg_flags |= MSG_MORE;
 
@@ -1099,7 +1099,7 @@ ksocknal_write_space (struct sock *sk)
                                       " ready" : " blocked"),
                (conn == NULL) ? "" : (conn->ksnc_tx_scheduled ?
                                       " scheduled" : " idle"),
-               (conn == NULL) ? "" : (cfs_list_empty (&conn->ksnc_tx_queue) ?
+               (conn == NULL) ? "" : (list_empty (&conn->ksnc_tx_queue) ?
                                       " empty" : " queued"));
 
         if (conn == NULL) {             /* raced with ksocknal_terminate_conn */

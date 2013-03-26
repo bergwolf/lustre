@@ -91,7 +91,7 @@ int cl_object_header_init(struct cl_object_header *h)
                 h->coh_pages = 0;
                 /* XXX hard coded GFP_* mask. */
                 INIT_RADIX_TREE(&h->coh_tree, GFP_ATOMIC);
-                CFS_INIT_LIST_HEAD(&h->coh_locks);
+                INIT_LIST_HEAD(&h->coh_locks);
 		h->coh_page_bufsize = ALIGN(sizeof(struct cl_page), 8);
         }
         RETURN(result);
@@ -103,7 +103,7 @@ EXPORT_SYMBOL(cl_object_header_init);
  */
 void cl_object_header_fini(struct cl_object_header *h)
 {
-        LASSERT(cfs_list_empty(&h->coh_locks));
+        LASSERT(list_empty(&h->coh_locks));
         lu_object_header_fini(&h->coh_lu);
 }
 EXPORT_SYMBOL(cl_object_header_fini);
@@ -226,7 +226,7 @@ int cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
 
         top = obj->co_lu.lo_header;
         result = 0;
-        cfs_list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+        list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
                 if (obj->co_ops->coo_attr_get != NULL) {
                         result = obj->co_ops->coo_attr_get(env, obj, attr);
                         if (result != 0) {
@@ -258,7 +258,7 @@ int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
 
         top = obj->co_lu.lo_header;
         result = 0;
-        cfs_list_for_each_entry_reverse(obj, &top->loh_layers,
+        list_for_each_entry_reverse(obj, &top->loh_layers,
                                         co_lu.lo_linkage) {
                 if (obj->co_ops->coo_attr_set != NULL) {
                         result = obj->co_ops->coo_attr_set(env, obj, attr, v);
@@ -290,7 +290,7 @@ int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
         ENTRY;
         top = obj->co_lu.lo_header;
         result = 0;
-        cfs_list_for_each_entry_reverse(obj, &top->loh_layers,
+        list_for_each_entry_reverse(obj, &top->loh_layers,
                                         co_lu.lo_linkage) {
                 if (obj->co_ops->coo_glimpse != NULL) {
                         result = obj->co_ops->coo_glimpse(env, obj, lvb);
@@ -319,7 +319,7 @@ int cl_conf_set(const struct lu_env *env, struct cl_object *obj,
         ENTRY;
         top = obj->co_lu.lo_header;
         result = 0;
-        cfs_list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
+        list_for_each_entry(obj, &top->loh_layers, co_lu.lo_linkage) {
                 if (obj->co_ops->coo_conf_set != NULL) {
                         result = obj->co_ops->coo_conf_set(env, obj, conf);
                         if (result != 0)
@@ -378,7 +378,7 @@ int cl_object_has_locks(struct cl_object *obj)
 	int has;
 
 	spin_lock(&head->coh_lock_guard);
-	has = cfs_list_empty(&head->coh_locks);
+	has = list_empty(&head->coh_locks);
 	spin_unlock(&head->coh_lock_guard);
 
 	return (has == 0);
@@ -545,7 +545,7 @@ struct cl_env {
          * This allows cl_env to be entered into cl_env_hash which implements
          * the current thread -> client environment lookup.
          */
-        cfs_hlist_node_t  ce_node;
+        struct hlist_node  ce_node;
 #endif
         /**
          * Owner for the current cl_env.
@@ -564,7 +564,7 @@ struct cl_env {
          * Linkage into global list of all client environments. Used for
          * garbage collection.
          */
-        cfs_list_t        ce_linkage;
+        struct list_head        ce_linkage;
         /*
          *
          */
@@ -617,14 +617,14 @@ static unsigned cl_env_hops_hash(cfs_hash_t *lh,
 #endif
 }
 
-static void *cl_env_hops_obj(cfs_hlist_node_t *hn)
+static void *cl_env_hops_obj(struct hlist_node *hn)
 {
-        struct cl_env *cle = cfs_hlist_entry(hn, struct cl_env, ce_node);
+        struct cl_env *cle = hlist_entry(hn, struct cl_env, ce_node);
         LASSERT(cle->ce_magic == &cl_env_init0);
         return (void *)cle;
 }
 
-static int cl_env_hops_keycmp(const void *key, cfs_hlist_node_t *hn)
+static int cl_env_hops_keycmp(const void *key, struct hlist_node *hn)
 {
         struct cl_env *cle = cl_env_hops_obj(hn);
 
@@ -632,9 +632,9 @@ static int cl_env_hops_keycmp(const void *key, cfs_hlist_node_t *hn)
         return (key == cle->ce_owner);
 }
 
-static void cl_env_hops_noop(cfs_hash_t *hs, cfs_hlist_node_t *hn)
+static void cl_env_hops_noop(cfs_hash_t *hs, struct hlist_node *hn)
 {
-        struct cl_env *cle = cfs_hlist_entry(hn, struct cl_env, ce_node);
+        struct cl_env *cle = hlist_entry(hn, struct cl_env, ce_node);
         LASSERT(cle->ce_magic == &cl_env_init0);
 }
 
@@ -753,7 +753,7 @@ static struct lu_env *cl_env_new(__u32 ctx_tags, __u32 ses_tags, void *debug)
         if (cle != NULL) {
                 int rc;
 
-                CFS_INIT_LIST_HEAD(&cle->ce_linkage);
+                INIT_LIST_HEAD(&cle->ce_linkage);
                 cle->ce_magic = &cl_env_init0;
                 env = &cle->ce_lu;
                 rc = lu_env_init(env, LCT_CL_THREAD|ctx_tags);

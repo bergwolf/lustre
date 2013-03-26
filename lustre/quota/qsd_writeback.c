@@ -65,7 +65,7 @@ static struct qsd_upd_rec *qsd_upd_alloc(struct qsd_qtype_info *qqi,
 	}
 
 	/* fill it */
-	CFS_INIT_LIST_HEAD(&upd->qur_link);
+	INIT_LIST_HEAD(&upd->qur_link);
 	upd->qur_qqi = qqi;
 	upd->qur_lqe = lqe;
 	if (lqe)
@@ -101,12 +101,12 @@ static void qsd_upd_add(struct qsd_instance *qsd, struct qsd_upd_rec *upd)
 }
 
 /* must hold the qsd_lock */
-static void qsd_add_deferred(cfs_list_t *list, struct qsd_upd_rec *upd)
+static void qsd_add_deferred(struct list_head *list, struct qsd_upd_rec *upd)
 {
 	struct qsd_upd_rec	*tmp, *n;
 
 	/* Sort the updates in ascending order */
-	cfs_list_for_each_entry_safe_reverse(tmp, n, list, qur_link) {
+	list_for_each_entry_safe_reverse(tmp, n, list, qur_link) {
 
 		/* There could be some legacy records which have duplicated
 		 * version. Imagine following scenario: slave received global
@@ -119,22 +119,22 @@ static void qsd_add_deferred(cfs_list_t *list, struct qsd_upd_rec *upd)
 			LASSERT(tmp->qur_lqe);
 			LQUOTA_ERROR(tmp->qur_lqe, "Found a conflict record "
 				     "with ver:"LPU64"", tmp->qur_ver);
-			cfs_list_del_init(&tmp->qur_link);
+			list_del_init(&tmp->qur_link);
 			qsd_upd_free(tmp);
 		}
 
 		if (upd->qur_ver < tmp->qur_ver) {
 			continue;
 		} else {
-			cfs_list_add_tail(&upd->qur_link, &tmp->qur_link);
+			list_add_tail(&upd->qur_link, &tmp->qur_link);
 			return;
 		}
 	}
-	cfs_list_add(&upd->qur_link, list);
+	list_add(&upd->qur_link, list);
 }
 
 /* must hold the qsd_lock */
-static void qsd_kickoff_deferred(struct qsd_qtype_info *qqi, cfs_list_t *list,
+static void qsd_kickoff_deferred(struct qsd_qtype_info *qqi, struct list_head *list,
 				 __u64 ver)
 {
 	struct qsd_upd_rec	*upd, *tmp;
@@ -143,10 +143,10 @@ static void qsd_kickoff_deferred(struct qsd_qtype_info *qqi, cfs_list_t *list,
 	/* Get the first update record in the list, which has the smallest
 	 * version, discard all records with versions smaller than the current
 	 * one */
-	cfs_list_for_each_entry_safe(upd, tmp, list, qur_link) {
+	list_for_each_entry_safe(upd, tmp, list, qur_link) {
 		if (upd->qur_ver <= ver) {
 			/* drop this update */
-			cfs_list_del_init(&upd->qur_link);
+			list_del_init(&upd->qur_link);
 			CDEBUG(D_QUOTA, "%s: skipping deferred update ver:"
 			       LPU64"/"LPU64", global:%d, qid:"LPU64"\n",
 			       qqi->qqi_qsd->qsd_svname, upd->qur_ver, ver,
@@ -158,7 +158,7 @@ static void qsd_kickoff_deferred(struct qsd_qtype_info *qqi, cfs_list_t *list,
 	}
 
 	/* No remaining deferred update */
-	if (cfs_list_empty(list))
+	if (list_empty(list))
 		RETURN_EXIT;
 
 	CDEBUG(D_QUOTA, "%s: found deferred update record. "
@@ -185,7 +185,7 @@ static void qsd_kickoff_deferred(struct qsd_qtype_info *qqi, cfs_list_t *list,
  */
 void qsd_bump_version(struct qsd_qtype_info *qqi, __u64 ver, bool global)
 {
-	cfs_list_t	*list;
+	struct list_head	*list;
 	__u64		*idx_ver;
 
 	idx_ver = global ? &qqi->qqi_glb_ver : &qqi->qqi_slv_ver;
@@ -259,7 +259,7 @@ void qsd_upd_schedule(struct qsd_qtype_info *qqi, struct lquota_entry *lqe,
 		/* Out of order update (the one with smaller version hasn't
 		 * reached slave or hasn't been flushed to disk yet), or
 		 * the reintegration is in progress. Defer the update. */
-		cfs_list_t *list = global ? &qqi->qqi_deferred_glb :
+		struct list_head *list = global ? &qqi->qqi_deferred_glb :
 					    &qqi->qqi_deferred_slv;
 		qsd_add_deferred(list, upd);
 	}
@@ -316,13 +316,13 @@ void qsd_adjust_schedule(struct lquota_entry *lqe, bool defer, bool cancel)
 
 	/* the lqe is being queued for the per-ID lock cancel, we should
 	 * cancel the lock cancel and re-add it for quota adjust */
-	if (!cfs_list_empty(&lqe->lqe_link) &&
+	if (!list_empty(&lqe->lqe_link) &&
 	    lqe->lqe_adjust_time == 0) {
-		cfs_list_del_init(&lqe->lqe_link);
+		list_del_init(&lqe->lqe_link);
 		lqe_putref(lqe);
 	}
 
-	if (cfs_list_empty(&lqe->lqe_link)) {
+	if (list_empty(&lqe->lqe_link)) {
 		if (cancel)
 			lqe->lqe_adjust_time = 0;
 		else
@@ -331,10 +331,10 @@ void qsd_adjust_schedule(struct lquota_entry *lqe, bool defer, bool cancel)
 				cfs_time_current_64();
 		/* lqe reference transfered to list */
 		if (defer)
-			cfs_list_add_tail(&lqe->lqe_link,
+			list_add_tail(&lqe->lqe_link,
 					  &qsd->qsd_adjust_list);
 		else
-			cfs_list_add(&lqe->lqe_link, &qsd->qsd_adjust_list);
+			list_add(&lqe->lqe_link, &qsd->qsd_adjust_list);
 		added = true;
 	}
 	spin_unlock(&qsd->qsd_adjust_lock);
@@ -347,19 +347,19 @@ void qsd_adjust_schedule(struct lquota_entry *lqe, bool defer, bool cancel)
 
 /* return true if there is pending writeback records or the pending
  * adjust requests */
-static bool qsd_job_pending(struct qsd_instance *qsd, cfs_list_t *upd,
+static bool qsd_job_pending(struct qsd_instance *qsd, struct list_head *upd,
 			    bool *uptodate)
 {
 	bool	job_pending = false;
 	int	qtype;
 
-	LASSERT(cfs_list_empty(upd));
+	LASSERT(list_empty(upd));
 	*uptodate = true;
 
 	spin_lock(&qsd->qsd_adjust_lock);
-	if (!cfs_list_empty(&qsd->qsd_adjust_list)) {
+	if (!list_empty(&qsd->qsd_adjust_list)) {
 		struct lquota_entry *lqe;
-		lqe = cfs_list_entry(qsd->qsd_adjust_list.next,
+		lqe = list_entry(qsd->qsd_adjust_list.next,
 				     struct lquota_entry, lqe_link);
 		if (cfs_time_beforeq_64(lqe->lqe_adjust_time,
 					cfs_time_current_64()))
@@ -368,8 +368,8 @@ static bool qsd_job_pending(struct qsd_instance *qsd, cfs_list_t *upd,
 	spin_unlock(&qsd->qsd_adjust_lock);
 
 	write_lock(&qsd->qsd_lock);
-	if (!cfs_list_empty(&qsd->qsd_upd_list)) {
-		cfs_list_splice_init(&qsd->qsd_upd_list, upd);
+	if (!list_empty(&qsd->qsd_upd_list)) {
+		list_splice_init(&qsd->qsd_upd_list, upd);
 		job_pending = true;
 	}
 
@@ -402,7 +402,7 @@ static int qsd_upd_thread(void *arg)
 	struct qsd_instance	*qsd = (struct qsd_instance *)arg;
 	struct ptlrpc_thread	*thread = &qsd->qsd_upd_thread;
 	struct l_wait_info	 lwi;
-	cfs_list_t		 queue;
+	struct list_head		 queue;
 	struct qsd_upd_rec	*upd, *n;
 	struct lu_env		*env;
 	int			 qtype, rc = 0;
@@ -425,29 +425,29 @@ static int qsd_upd_thread(void *arg)
 	thread_set_flags(thread, SVC_RUNNING);
 	cfs_waitq_signal(&thread->t_ctl_waitq);
 
-	CFS_INIT_LIST_HEAD(&queue);
+	INIT_LIST_HEAD(&queue);
 	lwi = LWI_TIMEOUT(cfs_time_seconds(QSD_WB_INTERVAL), NULL, NULL);
 	while (1) {
 		l_wait_event(thread->t_ctl_waitq,
 			     qsd_job_pending(qsd, &queue, &uptodate) ||
 			     !thread_is_running(thread), &lwi);
 
-		cfs_list_for_each_entry_safe(upd, n, &queue, qur_link) {
-			cfs_list_del_init(&upd->qur_link);
+		list_for_each_entry_safe(upd, n, &queue, qur_link) {
+			list_del_init(&upd->qur_link);
 			qsd_process_upd(env, upd);
 			qsd_upd_free(upd);
 		}
 
 		spin_lock(&qsd->qsd_adjust_lock);
 		cur_time = cfs_time_current_64();
-		cfs_list_for_each_entry_safe(lqe, tmp, &qsd->qsd_adjust_list,
+		list_for_each_entry_safe(lqe, tmp, &qsd->qsd_adjust_list,
 					     lqe_link) {
 			/* deferred items are sorted by time */
 			if (!cfs_time_beforeq_64(lqe->lqe_adjust_time,
 						 cur_time))
 				break;
 
-			cfs_list_del_init(&lqe->lqe_link);
+			list_del_init(&lqe->lqe_link);
 			spin_unlock(&qsd->qsd_adjust_lock);
 
 			if (thread_is_running(thread) && uptodate) {
@@ -513,7 +513,7 @@ static void qsd_cleanup_deferred(struct qsd_instance *qsd)
 			continue;
 
 		write_lock(&qsd->qsd_lock);
-		cfs_list_for_each_entry_safe(upd, tmp, &qqi->qqi_deferred_glb,
+		list_for_each_entry_safe(upd, tmp, &qqi->qqi_deferred_glb,
 					     qur_link) {
 			CWARN("%s: Free global deferred upd: ID:"LPU64", "
 			      "ver:"LPU64"/"LPU64"\n", qsd->qsd_svname,
@@ -522,7 +522,7 @@ static void qsd_cleanup_deferred(struct qsd_instance *qsd)
 			list_del_init(&upd->qur_link);
 			qsd_upd_free(upd);
 		}
-		cfs_list_for_each_entry_safe(upd, tmp, &qqi->qqi_deferred_slv,
+		list_for_each_entry_safe(upd, tmp, &qqi->qqi_deferred_slv,
 					     qur_link) {
 			CWARN("%s: Free slave deferred upd: ID:"LPU64", "
 			      "ver:"LPU64"/"LPU64"\n", qsd->qsd_svname,
@@ -540,10 +540,10 @@ static void qsd_cleanup_adjust(struct qsd_instance *qsd)
 	struct lquota_entry	*lqe;
 
 	spin_lock(&qsd->qsd_adjust_lock);
-	while (!cfs_list_empty(&qsd->qsd_adjust_list)) {
-		lqe = cfs_list_entry(qsd->qsd_adjust_list.next,
+	while (!list_empty(&qsd->qsd_adjust_list)) {
+		lqe = list_entry(qsd->qsd_adjust_list.next,
 				     struct lquota_entry, lqe_link);
-		cfs_list_del_init(&lqe->lqe_link);
+		list_del_init(&lqe->lqe_link);
 		lqe_putref(lqe);
 	}
 	spin_unlock(&qsd->qsd_adjust_lock);

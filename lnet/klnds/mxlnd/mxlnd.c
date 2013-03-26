@@ -120,8 +120,8 @@ mxlnd_ctx_init(kmx_ctx_t *ctx)
         ctx->mxc_incarnation = 0;
         ctx->mxc_deadline = 0;
         ctx->mxc_state = MXLND_CTX_IDLE;
-        if (!cfs_list_empty(&ctx->mxc_list))
-                cfs_list_del_init(&ctx->mxc_list);
+        if (!list_empty(&ctx->mxc_list))
+                list_del_init(&ctx->mxc_list);
         /* ignore mxc_rx_list */
         if (ctx->mxc_type == MXLND_REQ_TX) {
                 ctx->mxc_nid = 0;
@@ -230,7 +230,7 @@ mxlnd_init_txs(void)
                 tx = &kmxlnd_data.kmx_txs[i];
                 tx->mxc_type = MXLND_REQ_TX;
 
-                CFS_INIT_LIST_HEAD(&tx->mxc_list);
+                INIT_LIST_HEAD(&tx->mxc_list);
 
                 /* map mxc_msg to page */
                 page = pages->mxg_pages[ipage];
@@ -251,7 +251,7 @@ mxlnd_init_txs(void)
                 }
 
                 /* in startup(), no locks required */
-                cfs_list_add_tail(&tx->mxc_list, &kmxlnd_data.kmx_tx_idle);
+                list_add_tail(&tx->mxc_list, &kmxlnd_data.kmx_tx_idle);
         }
 
         return 0;
@@ -271,10 +271,10 @@ mxlnd_free_peers(void)
         kmx_peer_t     *next   = NULL;
 
         for (i = 0; i < MXLND_HASH_SIZE; i++) {
-                cfs_list_for_each_entry_safe(peer, next,
+                list_for_each_entry_safe(peer, next,
                                              &kmxlnd_data.kmx_peers[i],
                                              mxp_list) {
-                        cfs_list_del_init(&peer->mxp_list);
+                        list_del_init(&peer->mxp_list);
                         if (peer->mxp_conn) mxlnd_conn_decref(peer->mxp_conn);
                         mxlnd_peer_decref(peer);
                         count++;
@@ -564,20 +564,20 @@ mxlnd_startup (lnet_ni_t *ni)
 	rwlock_init (&kmxlnd_data.kmx_global_lock);
 	spin_lock_init (&kmxlnd_data.kmx_mem_lock);
 
-        CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_conn_reqs);
-        CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_conn_zombies);
-        CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_orphan_msgs);
+        INIT_LIST_HEAD (&kmxlnd_data.kmx_conn_reqs);
+        INIT_LIST_HEAD (&kmxlnd_data.kmx_conn_zombies);
+        INIT_LIST_HEAD (&kmxlnd_data.kmx_orphan_msgs);
 	spin_lock_init (&kmxlnd_data.kmx_conn_lock);
 	sema_init(&kmxlnd_data.kmx_conn_sem, 0);
 
         for (i = 0; i < MXLND_HASH_SIZE; i++) {
-                CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_peers[i]);
+                INIT_LIST_HEAD (&kmxlnd_data.kmx_peers[i]);
         }
 
-        CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_tx_idle);
+        INIT_LIST_HEAD (&kmxlnd_data.kmx_tx_idle);
 	spin_lock_init (&kmxlnd_data.kmx_tx_idle_lock);
 	kmxlnd_data.kmx_tx_next_cookie = 1;
-	CFS_INIT_LIST_HEAD (&kmxlnd_data.kmx_tx_queue);
+	INIT_LIST_HEAD (&kmxlnd_data.kmx_tx_queue);
 	spin_lock_init (&kmxlnd_data.kmx_tx_queue_lock);
 	sema_init(&kmxlnd_data.kmx_tx_queue_sem, 0);
 

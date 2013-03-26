@@ -210,7 +210,7 @@ void cl_lock_slice_add(struct cl_lock *lock, struct cl_lock_slice *slice,
 {
         ENTRY;
         slice->cls_lock = lock;
-        cfs_list_add_tail(&slice->cls_linkage, &lock->cll_layers);
+        list_add_tail(&slice->cls_linkage, &lock->cll_layers);
         slice->cls_obj = obj;
         slice->cls_ops = ops;
         EXIT;
@@ -274,12 +274,12 @@ static void cl_lock_free(const struct lu_env *env, struct cl_lock *lock)
         ENTRY;
         cl_lock_trace(D_DLMTRACE, env, "free lock", lock);
         cfs_might_sleep();
-        while (!cfs_list_empty(&lock->cll_layers)) {
+        while (!list_empty(&lock->cll_layers)) {
                 struct cl_lock_slice *slice;
 
-                slice = cfs_list_entry(lock->cll_layers.next,
+                slice = list_entry(lock->cll_layers.next,
                                        struct cl_lock_slice, cls_linkage);
-                cfs_list_del_init(lock->cll_layers.next);
+                list_del_init(lock->cll_layers.next);
                 slice->cls_ops->clo_fini(env, slice);
         }
 	CS_LOCK_DEC(obj, total);
@@ -316,7 +316,7 @@ void cl_lock_put(const struct lu_env *env, struct cl_lock *lock)
 
         if (cfs_atomic_dec_and_test(&lock->cll_ref)) {
                 if (lock->cll_state == CLS_FREEING) {
-                        LASSERT(cfs_list_empty(&lock->cll_linkage));
+                        LASSERT(list_empty(&lock->cll_linkage));
                         cl_lock_free(env, lock);
                 }
 		CS_LOCK_DEC(obj, busy);
@@ -392,9 +392,9 @@ static struct cl_lock *cl_lock_alloc(const struct lu_env *env,
                 cl_object_get(obj);
                 lock->cll_obj_ref = lu_object_ref_add(&obj->co_lu,
                                                       "cl_lock", lock);
-                CFS_INIT_LIST_HEAD(&lock->cll_layers);
-                CFS_INIT_LIST_HEAD(&lock->cll_linkage);
-                CFS_INIT_LIST_HEAD(&lock->cll_inclosure);
+                INIT_LIST_HEAD(&lock->cll_layers);
+                INIT_LIST_HEAD(&lock->cll_linkage);
+                INIT_LIST_HEAD(&lock->cll_inclosure);
                 lu_ref_init(&lock->cll_reference);
                 lu_ref_init(&lock->cll_holders);
 		mutex_init(&lock->cll_guard);
@@ -405,7 +405,7 @@ static struct cl_lock *cl_lock_alloc(const struct lu_env *env,
 		CS_LOCK_INC(obj, total);
 		CS_LOCK_INC(obj, create);
                 cl_lock_lockdep_init(lock);
-                cfs_list_for_each_entry(obj, &head->loh_layers,
+                list_for_each_entry(obj, &head->loh_layers,
                                         co_lu.lo_linkage) {
                         int err;
 
@@ -486,7 +486,7 @@ static int cl_lock_fits_into(const struct lu_env *env,
 
         LINVRNT(cl_lock_invariant_trusted(env, lock));
         ENTRY;
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_ops->clo_fits_into != NULL &&
                     !slice->cls_ops->clo_fits_into(env, slice, need, io))
                         RETURN(0);
@@ -507,7 +507,7 @@ static struct cl_lock *cl_lock_lookup(const struct lu_env *env,
         head = cl_object_header(obj);
         LINVRNT_SPIN_LOCKED(&head->coh_lock_guard);
 	CS_LOCK_INC(obj, lookup);
-        cfs_list_for_each_entry(lock, &head->coh_locks, cll_linkage) {
+        list_for_each_entry(lock, &head->coh_locks, cll_linkage) {
                 int matched;
 
                 matched = cl_lock_ext_match(&lock->cll_descr, need) &&
@@ -562,7 +562,7 @@ static struct cl_lock *cl_lock_find(const struct lu_env *env,
 			spin_lock(&head->coh_lock_guard);
 			ghost = cl_lock_lookup(env, obj, io, need);
 			if (ghost == NULL) {
-				cfs_list_add_tail(&lock->cll_linkage,
+				list_add_tail(&lock->cll_linkage,
 						  &head->coh_locks);
 				spin_unlock(&head->coh_lock_guard);
 				CS_LOCK_INC(obj, busy);
@@ -649,7 +649,7 @@ const struct cl_lock_slice *cl_lock_at(const struct cl_lock *lock,
         LINVRNT(cl_lock_invariant_trusted(NULL, lock));
         ENTRY;
 
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_obj->co_lu.lo_dev->ld_type == dtype)
                         RETURN(slice);
         }
@@ -806,7 +806,7 @@ static void cl_lock_cancel0(const struct lu_env *env, struct cl_lock *lock)
                 const struct cl_lock_slice *slice;
 
                 lock->cll_flags |= CLF_CANCELLED;
-                cfs_list_for_each_entry_reverse(slice, &lock->cll_layers,
+                list_for_each_entry_reverse(slice, &lock->cll_layers,
                                                 cls_linkage) {
                         if (slice->cls_ops->clo_cancel != NULL)
                                 slice->cls_ops->clo_cancel(env, slice);
@@ -831,14 +831,14 @@ static void cl_lock_delete0(const struct lu_env *env, struct cl_lock *lock)
                 head = cl_object_header(lock->cll_descr.cld_obj);
 
 		spin_lock(&head->coh_lock_guard);
-		cfs_list_del_init(&lock->cll_linkage);
+		list_del_init(&lock->cll_linkage);
 		spin_unlock(&head->coh_lock_guard);
 
                 /*
                  * From now on, no new references to this lock can be acquired
                  * by cl_lock_lookup().
                  */
-                cfs_list_for_each_entry_reverse(slice, &lock->cll_layers,
+                list_for_each_entry_reverse(slice, &lock->cll_layers,
                                                 cls_linkage) {
                         if (slice->cls_ops->clo_delete != NULL)
                                 slice->cls_ops->clo_delete(env, slice);
@@ -1004,7 +1004,7 @@ static void cl_lock_state_signal(const struct lu_env *env, struct cl_lock *lock,
         LINVRNT(cl_lock_is_mutexed(lock));
         LINVRNT(cl_lock_invariant(env, lock));
 
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage)
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage)
                 if (slice->cls_ops->clo_state != NULL)
                         slice->cls_ops->clo_state(env, slice, state);
         cfs_waitq_broadcast(&lock->cll_wq);
@@ -1073,7 +1073,7 @@ static int cl_unuse_try_internal(const struct lu_env *env, struct cl_lock *lock)
                 LASSERT(lock->cll_state == CLS_INTRANSIT);
 
                 result = -ENOSYS;
-                cfs_list_for_each_entry_reverse(slice, &lock->cll_layers,
+                list_for_each_entry_reverse(slice, &lock->cll_layers,
                                                 cls_linkage) {
                         if (slice->cls_ops->clo_unuse != NULL) {
                                 result = slice->cls_ops->clo_unuse(env, slice);
@@ -1108,7 +1108,7 @@ int cl_use_try(const struct lu_env *env, struct cl_lock *lock, int atomic)
 
         result = -ENOSYS;
         state = cl_lock_intransit(env, lock);
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_ops->clo_use != NULL) {
                         result = slice->cls_ops->clo_use(env, slice);
                         if (result != 0)
@@ -1161,7 +1161,7 @@ static int cl_enqueue_kick(const struct lu_env *env,
 
         ENTRY;
         result = -ENOSYS;
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_ops->clo_enqueue != NULL) {
                         result = slice->cls_ops->clo_enqueue(env,
                                                              slice, io, flags);
@@ -1491,7 +1491,7 @@ int cl_wait_try(const struct lu_env *env, struct cl_lock *lock)
                         break;
 
                 result = -ENOSYS;
-                cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+                list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                         if (slice->cls_ops->clo_wait != NULL) {
                                 result = slice->cls_ops->clo_wait(env, slice);
                                 if (result != 0)
@@ -1564,7 +1564,7 @@ unsigned long cl_lock_weigh(const struct lu_env *env, struct cl_lock *lock)
         LINVRNT(cl_lock_invariant(env, lock));
 
         pound = 0;
-        cfs_list_for_each_entry_reverse(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry_reverse(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_ops->clo_weigh != NULL) {
                         ounce = slice->cls_ops->clo_weigh(env, slice);
                         pound += ounce;
@@ -1601,7 +1601,7 @@ int cl_lock_modify(const struct lu_env *env, struct cl_lock *lock,
         LINVRNT(cl_lock_is_mutexed(lock));
         LINVRNT(cl_lock_invariant(env, lock));
 
-        cfs_list_for_each_entry_reverse(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry_reverse(slice, &lock->cll_layers, cls_linkage) {
                 if (slice->cls_ops->clo_modify != NULL) {
                         result = slice->cls_ops->clo_modify(env, slice, desc);
                         if (result != 0)
@@ -1634,7 +1634,7 @@ void cl_lock_closure_init(const struct lu_env *env,
         LINVRNT(cl_lock_is_mutexed(origin));
         LINVRNT(cl_lock_invariant(env, origin));
 
-        CFS_INIT_LIST_HEAD(&closure->clc_list);
+        INIT_LIST_HEAD(&closure->clc_list);
         closure->clc_origin = origin;
         closure->clc_wait   = wait;
         closure->clc_nr     = 0;
@@ -1663,7 +1663,7 @@ int cl_lock_closure_build(const struct lu_env *env, struct cl_lock *lock,
 
         result = cl_lock_enclosure(env, lock, closure);
         if (result == 0) {
-                cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+                list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                         if (slice->cls_ops->clo_closure != NULL) {
                                 result = slice->cls_ops->clo_closure(env, slice,
                                                                      closure);
@@ -1696,10 +1696,10 @@ int cl_lock_enclosure(const struct lu_env *env, struct cl_lock *lock,
                  * If lock->cll_inclosure is not empty, lock is already in
                  * this closure.
                  */
-                if (cfs_list_empty(&lock->cll_inclosure)) {
+                if (list_empty(&lock->cll_inclosure)) {
                         cl_lock_get_trust(lock);
                         lu_ref_add(&lock->cll_reference, "closure", closure);
-                        cfs_list_add(&lock->cll_inclosure, &closure->clc_list);
+                        list_add(&lock->cll_inclosure, &closure->clc_list);
                         closure->clc_nr++;
                 } else
                         cl_lock_mutex_put(env, lock);
@@ -1733,9 +1733,9 @@ void cl_lock_disclosure(const struct lu_env *env,
         struct cl_lock *temp;
 
         cl_lock_trace(D_DLMTRACE, env, "disclosure lock", closure->clc_origin);
-        cfs_list_for_each_entry_safe(scan, temp, &closure->clc_list,
+        list_for_each_entry_safe(scan, temp, &closure->clc_list,
                                      cll_inclosure){
-                cfs_list_del_init(&scan->cll_inclosure);
+                list_del_init(&scan->cll_inclosure);
                 cl_lock_mutex_put(env, scan);
                 lu_ref_del(&scan->cll_reference, "closure", closure);
                 cl_lock_put(env, scan);
@@ -1749,7 +1749,7 @@ EXPORT_SYMBOL(cl_lock_disclosure);
 void cl_lock_closure_fini(struct cl_lock_closure *closure)
 {
         LASSERT(closure->clc_nr == 0);
-        LASSERT(cfs_list_empty(&closure->clc_list));
+        LASSERT(list_empty(&closure->clc_list));
 }
 EXPORT_SYMBOL(cl_lock_closure_fini);
 
@@ -1872,7 +1872,7 @@ struct cl_lock *cl_lock_at_pgoff(const struct lu_env *env,
 	spin_lock(&head->coh_lock_guard);
         /* It is fine to match any group lock since there could be only one
          * with a uniq gid and it conflicts with all other lock modes too */
-        cfs_list_for_each_entry(scan, &head->coh_locks, cll_linkage) {
+        list_for_each_entry(scan, &head->coh_locks, cll_linkage) {
                 if (scan != except &&
                     (scan->cll_descr.cld_mode == CLM_GROUP ||
                     cl_lock_ext_match(&scan->cll_descr, need)) &&
@@ -2043,7 +2043,7 @@ void cl_locks_prune(const struct lu_env *env, struct cl_object *obj, int cancel)
                      head->coh_tree.rnode == NULL && head->coh_pages == 0));
 
 	spin_lock(&head->coh_lock_guard);
-	while (!cfs_list_empty(&head->coh_locks)) {
+	while (!list_empty(&head->coh_locks)) {
 		lock = container_of(head->coh_locks.next,
 				    struct cl_lock, cll_linkage);
 		cl_lock_get_trust(lock);
@@ -2296,7 +2296,7 @@ void cl_lock_print(const struct lu_env *env, void *cookie,
         cl_lock_descr_print(env, cookie, printer, &lock->cll_descr);
         (*printer)(env, cookie, " {\n");
 
-        cfs_list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
+        list_for_each_entry(slice, &lock->cll_layers, cls_linkage) {
                 (*printer)(env, cookie, "    %s@%p: ",
                            slice->cls_obj->co_lu.lo_dev->ld_type->ldt_name,
                            slice);

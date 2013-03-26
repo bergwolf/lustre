@@ -113,7 +113,7 @@ kptllnd_setup_tx_descs()
                         return -ENOMEM;
 
 		spin_lock(&kptllnd_data.kptl_tx_lock);
-                cfs_list_add_tail(&tx->tx_list, &kptllnd_data.kptl_idle_txs);
+                list_add_tail(&tx->tx_list, &kptllnd_data.kptl_idle_txs);
 		spin_unlock(&kptllnd_data.kptl_tx_lock);
         }
 
@@ -128,11 +128,11 @@ kptllnd_cleanup_tx_descs()
         /* No locking; single threaded now */
         LASSERT (kptllnd_data.kptl_shutdown == 2);
 
-        while (!cfs_list_empty(&kptllnd_data.kptl_idle_txs)) {
-                tx = cfs_list_entry(kptllnd_data.kptl_idle_txs.next,
+        while (!list_empty(&kptllnd_data.kptl_idle_txs)) {
+                tx = list_entry(kptllnd_data.kptl_idle_txs.next,
                                     kptl_tx_t, tx_list);
 
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
                 kptllnd_free_tx(tx);
         }
 
@@ -163,16 +163,16 @@ kptllnd_get_idle_tx(enum kptl_tx_type type)
 
 	spin_lock(&kptllnd_data.kptl_tx_lock);
 
-        if (cfs_list_empty (&kptllnd_data.kptl_idle_txs)) {
+        if (list_empty (&kptllnd_data.kptl_idle_txs)) {
 		spin_unlock(&kptllnd_data.kptl_tx_lock);
 
                 tx = kptllnd_alloc_tx();
                 if (tx == NULL)
                         return NULL;
         } else {
-                tx = cfs_list_entry(kptllnd_data.kptl_idle_txs.next, 
+                tx = list_entry(kptllnd_data.kptl_idle_txs.next, 
                                     kptl_tx_t, tx_list);
-                cfs_list_del(&tx->tx_list);
+                list_del(&tx->tx_list);
 
 		spin_unlock(&kptllnd_data.kptl_tx_lock);
         }
@@ -229,7 +229,7 @@ kptllnd_tx_abort_netio(kptl_tx_t *tx)
         /* stash the tx on its peer until it completes */
         cfs_atomic_set(&tx->tx_refcount, 1);
         tx->tx_active = 1;
-        cfs_list_add_tail(&tx->tx_list, &peer->peer_activeq);
+        list_add_tail(&tx->tx_list, &peer->peer_activeq);
         
 	spin_unlock_irqrestore(&peer->peer_lock, flags);
 
@@ -310,7 +310,7 @@ kptllnd_tx_abort_netio(kptl_tx_t *tx)
         /* stash the tx on its peer until it completes */
         cfs_atomic_set(&tx->tx_refcount, 1);
         tx->tx_active = 1;
-        cfs_list_add_tail(&tx->tx_list, &peer->peer_activeq);
+        list_add_tail(&tx->tx_list, &peer->peer_activeq);
 
         kptllnd_peer_addref(peer);              /* extra ref for me... */
 
@@ -358,7 +358,7 @@ kptllnd_tx_fini (kptl_tx_t *tx)
         tx->tx_idle = 1;
 
 	spin_lock(&kptllnd_data.kptl_tx_lock);
-        cfs_list_add_tail(&tx->tx_list, &kptllnd_data.kptl_idle_txs);
+        list_add_tail(&tx->tx_list, &kptllnd_data.kptl_idle_txs);
 	spin_unlock(&kptllnd_data.kptl_tx_lock);
 
         /* Must finalize AFTER freeing 'tx' */
@@ -507,7 +507,7 @@ kptllnd_tx_callback(ptl_event_t *ev)
                 return;
         }
 
-        cfs_list_del(&tx->tx_list);
+        list_del(&tx->tx_list);
         tx->tx_active = 0;
 
 	spin_unlock_irqrestore(&peer->peer_lock, flags);
@@ -517,7 +517,7 @@ kptllnd_tx_callback(ptl_event_t *ev)
                 /* ...finalize it in thread context! */
 		spin_lock_irqsave(&kptllnd_data.kptl_sched_lock, flags);
 
-                cfs_list_add_tail(&tx->tx_list, &kptllnd_data.kptl_sched_txq);
+                list_add_tail(&tx->tx_list, &kptllnd_data.kptl_sched_txq);
                 cfs_waitq_signal(&kptllnd_data.kptl_sched_waitq);
 
 		spin_unlock_irqrestore(&kptllnd_data.kptl_sched_lock,

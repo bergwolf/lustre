@@ -66,16 +66,16 @@ static void (*kill_super_cb)(struct super_block *sb) = NULL;
 /*********** mount lookup *********/
 
 DEFINE_MUTEX(lustre_mount_info_lock);
-static CFS_LIST_HEAD(server_mount_info_list);
+static LIST_HEAD(server_mount_info_list);
 
 static struct lustre_mount_info *server_find_mount(const char *name)
 {
-        cfs_list_t *tmp;
+        struct list_head *tmp;
         struct lustre_mount_info *lmi;
         ENTRY;
 
-        cfs_list_for_each(tmp, &server_mount_info_list) {
-                lmi = cfs_list_entry(tmp, struct lustre_mount_info,
+        list_for_each(tmp, &server_mount_info_list) {
+                lmi = list_entry(tmp, struct lustre_mount_info,
                                      lmi_list_chain);
                 if (strcmp(name, lmi->lmi_name) == 0)
                         RETURN(lmi);
@@ -117,7 +117,7 @@ static int server_register_mount(const char *name, struct super_block *sb,
         lmi->lmi_name = name_cp;
         lmi->lmi_sb = sb;
         lmi->lmi_mnt = mnt;
-        cfs_list_add(&lmi->lmi_list_chain, &server_mount_info_list);
+        list_add(&lmi->lmi_list_chain, &server_mount_info_list);
 
 	mutex_unlock(&lustre_mount_info_lock);
 
@@ -143,7 +143,7 @@ static int server_deregister_mount(const char *name)
 	CDEBUG(D_MOUNT, "dereg_mnt %p from %s\n", lmi->lmi_mnt, name);
 
         OBD_FREE(lmi->lmi_name, strlen(lmi->lmi_name) + 1);
-        cfs_list_del(&lmi->lmi_list_chain);
+        list_del(&lmi->lmi_list_chain);
         OBD_FREE(lmi, sizeof(*lmi));
 	mutex_unlock(&lustre_mount_info_lock);
 
@@ -941,7 +941,7 @@ cleanup:
 }
 EXPORT_SYMBOL(tgt_name2lwpname);
 
-static CFS_LIST_HEAD(lwp_register_list);
+static LIST_HEAD(lwp_register_list);
 DEFINE_MUTEX(lwp_register_list_lock);
 
 int lustre_register_lwp_item(char *lwpname, struct obd_export **exp,
@@ -980,8 +980,8 @@ int lustre_register_lwp_item(char *lwpname, struct obd_export **exp,
 	lri->lri_exp = exp;
 	lri->lri_cb_func = cb_func;
 	lri->lri_cb_data = cb_data;
-	CFS_INIT_LIST_HEAD(&lri->lri_list);
-	cfs_list_add(&lri->lri_list, &lwp_register_list);
+	INIT_LIST_HEAD(&lri->lri_list);
+	list_add(&lri->lri_list, &lwp_register_list);
 
 	if (*exp != NULL && cb_func != NULL)
 		cb_func(cb_data);
@@ -996,11 +996,11 @@ void lustre_deregister_lwp_item(struct obd_export **exp)
 	struct lwp_register_item *lri, *tmp;
 
 	mutex_lock(&lwp_register_list_lock);
-	cfs_list_for_each_entry_safe(lri, tmp, &lwp_register_list, lri_list) {
+	list_for_each_entry_safe(lri, tmp, &lwp_register_list, lri_list) {
 		if (exp == lri->lri_exp) {
 			if (*exp)
 				class_export_put(*exp);
-			cfs_list_del(&lri->lri_list);
+			list_del(&lri->lri_list);
 			OBD_FREE_PTR(lri);
 			break;
 		}
@@ -1015,7 +1015,7 @@ static void lustre_notify_lwp_list(struct obd_export *exp)
 	LASSERT(exp != NULL);
 
 	mutex_lock(&lwp_register_list_lock);
-	cfs_list_for_each_entry_safe(lri, tmp, &lwp_register_list, lri_list) {
+	list_for_each_entry_safe(lri, tmp, &lwp_register_list, lri_list) {
 		if (strcmp(exp->exp_obd->obd_name, lri->lri_name))
 			continue;
 		if (*lri->lri_exp != NULL)

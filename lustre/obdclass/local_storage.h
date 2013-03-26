@@ -38,13 +38,13 @@
 struct ls_device {
 	struct dt_device	 ls_top_dev;
 	/* all initialized ls_devices on this node linked by this */
-	cfs_list_t		 ls_linkage;
+	struct list_head		 ls_linkage;
 	/* how many handle's reference this local storage */
 	cfs_atomic_t		 ls_refcount;
 	/* underlaying OSD device */
 	struct dt_device	*ls_osd;
 	/* list of all local OID storages */
-	cfs_list_t		 ls_los_list;
+	struct list_head		 ls_los_list;
 	struct mutex		 ls_los_mutex;
 };
 

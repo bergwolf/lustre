@@ -50,7 +50,6 @@
 #include <utime.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <sys/queue.h>
 #include <sys/time.h>
 
 #include "sysio.h"

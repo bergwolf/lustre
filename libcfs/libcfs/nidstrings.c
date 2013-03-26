@@ -101,8 +101,8 @@ static int  libcfs_ip_str2addr(const char *str, int nob, __u32 *addr);
 static void libcfs_decnum_addr2str(__u32 addr, char *str);
 static void libcfs_hexnum_addr2str(__u32 addr, char *str);
 static int  libcfs_num_str2addr(const char *str, int nob, __u32 *addr);
-static int  libcfs_num_parse(char *str, int len, cfs_list_t *list);
-static int  libcfs_num_match(__u32 addr, cfs_list_t *list);
+static int  libcfs_num_parse(char *str, int len, struct list_head *list);
+static int  libcfs_num_match(__u32 addr, struct list_head *list);
 
 struct netstrfns {
         int          nf_type;
@@ -111,8 +111,8 @@ struct netstrfns {
         void       (*nf_addr2str)(__u32 addr, char *str);
         int        (*nf_str2addr)(const char *str, int nob, __u32 *addr);
         int        (*nf_parse_addrlist)(char *str, int len,
-                                        cfs_list_t *list);
-        int        (*nf_match_addr)(__u32 addr, cfs_list_t *list);
+                                        struct list_head *list);
+        int        (*nf_match_addr)(__u32 addr, struct list_head *list);
 };
 
 static struct netstrfns  libcfs_netstrfns[] = {
@@ -591,11 +591,11 @@ struct nidrange {
          * Link to list of this structures which is built on nid range
          * list parsing.
          */
-        cfs_list_t nr_link;
+        struct list_head nr_link;
         /**
          * List head for addrrange::ar_link.
          */
-        cfs_list_t nr_addrranges;
+        struct list_head nr_addrranges;
         /**
          * Flag indicating that *@<net> is found.
          */
@@ -617,11 +617,11 @@ struct addrrange {
         /**
          * Link to nidrange::nr_addrranges.
          */
-        cfs_list_t ar_link;
+        struct list_head ar_link;
         /**
 	 * List head for cfs_expr_list::el_list.
          */
-        cfs_list_t ar_numaddr_ranges;
+        struct list_head ar_numaddr_ranges;
 };
 
 /**
@@ -633,14 +633,14 @@ struct addrrange {
  * \retval errno otherwise
  */
 static int
-libcfs_num_parse(char *str, int len, cfs_list_t *list)
+libcfs_num_parse(char *str, int len, struct list_head *list)
 {
 	struct cfs_expr_list *el;
 	int	rc;
 
 	rc = cfs_expr_list_parse(str, len, 0, MAX_NUMERIC_VALUE, &el);
 	if (rc == 0)
-		cfs_list_add_tail(&el->el_link, list);
+		list_add_tail(&el->el_link, list);
 
 	return rc;
 }
@@ -667,8 +667,8 @@ parse_addrange(const struct cfs_lstr *src, struct nidrange *nidrange)
         LIBCFS_ALLOC(addrrange, sizeof(struct addrrange));
         if (addrrange == NULL)
                 return 0;
-        cfs_list_add_tail(&addrrange->ar_link, &nidrange->nr_addrranges);
-        CFS_INIT_LIST_HEAD(&addrrange->ar_numaddr_ranges);
+        list_add_tail(&addrrange->ar_link, &nidrange->nr_addrranges);
+        INIT_LIST_HEAD(&addrrange->ar_numaddr_ranges);
 
         return nidrange->nr_netstrfns->nf_parse_addrlist(src->ls_str,
                                                 src->ls_len,
@@ -687,7 +687,7 @@ parse_addrange(const struct cfs_lstr *src, struct nidrange *nidrange)
  */
 static struct nidrange *
 add_nidrange(const struct cfs_lstr *src,
-             cfs_list_t *nidlist)
+             struct list_head *nidlist)
 {
         struct netstrfns *nf;
         struct nidrange *nr;
@@ -713,7 +713,7 @@ add_nidrange(const struct cfs_lstr *src,
                         return NULL;
         }
 
-        cfs_list_for_each_entry(nr, nidlist, nr_link) {
+        list_for_each_entry(nr, nidlist, nr_link) {
                 if (nr->nr_netstrfns != nf)
                         continue;
                 if (nr->nr_netnum != netnum)
@@ -724,8 +724,8 @@ add_nidrange(const struct cfs_lstr *src,
         LIBCFS_ALLOC(nr, sizeof(struct nidrange));
         if (nr == NULL)
                 return NULL;
-        cfs_list_add_tail(&nr->nr_link, nidlist);
-        CFS_INIT_LIST_HEAD(&nr->nr_addrranges);
+        list_add_tail(&nr->nr_link, nidlist);
+        INIT_LIST_HEAD(&nr->nr_addrranges);
         nr->nr_netstrfns = nf;
         nr->nr_all = 0;
         nr->nr_netnum = netnum;
@@ -740,7 +740,7 @@ add_nidrange(const struct cfs_lstr *src,
  * \retval 0 otherwise
  */
 static int
-parse_nidrange(struct cfs_lstr *src, cfs_list_t *nidlist)
+parse_nidrange(struct cfs_lstr *src, struct list_head *nidlist)
 {
 	struct cfs_lstr addrrange;
 	struct cfs_lstr net;
@@ -776,15 +776,15 @@ parse_nidrange(struct cfs_lstr *src, cfs_list_t *nidlist)
  * \retval none
  */
 static void
-free_addrranges(cfs_list_t *list)
+free_addrranges(struct list_head *list)
 {
-	while (!cfs_list_empty(list)) {
+	while (!list_empty(list)) {
 		struct addrrange *ar;
 
-		ar = cfs_list_entry(list->next, struct addrrange, ar_link);
+		ar = list_entry(list->next, struct addrrange, ar_link);
 
 		cfs_expr_list_free_list(&ar->ar_numaddr_ranges);
-		cfs_list_del(&ar->ar_link);
+		list_del(&ar->ar_link);
 		LIBCFS_FREE(ar, sizeof(struct addrrange));
 	}
 }
@@ -798,15 +798,15 @@ free_addrranges(cfs_list_t *list)
  * \retval none
  */
 void
-cfs_free_nidlist(cfs_list_t *list)
+cfs_free_nidlist(struct list_head *list)
 {
-        cfs_list_t *pos, *next;
+        struct list_head *pos, *next;
         struct nidrange *nr;
 
-        cfs_list_for_each_safe(pos, next, list) {
-                nr = cfs_list_entry(pos, struct nidrange, nr_link);
+        list_for_each_safe(pos, next, list) {
+                nr = list_entry(pos, struct nidrange, nr_link);
                 free_addrranges(&nr->nr_addrranges);
-                cfs_list_del(pos);
+                list_del(pos);
                 LIBCFS_FREE(nr, sizeof(struct nidrange));
         }
 }
@@ -825,7 +825,7 @@ cfs_free_nidlist(cfs_list_t *list)
  * \retval 0 otherwise
  */
 int
-cfs_parse_nidlist(char *str, int len, cfs_list_t *nidlist)
+cfs_parse_nidlist(char *str, int len, struct list_head *nidlist)
 {
 	struct cfs_lstr src;
 	struct cfs_lstr res;
@@ -834,7 +834,7 @@ cfs_parse_nidlist(char *str, int len, cfs_list_t *nidlist)
 
         src.ls_str = str;
         src.ls_len = len;
-        CFS_INIT_LIST_HEAD(nidlist);
+        INIT_LIST_HEAD(nidlist);
         while (src.ls_str) {
 		rc = cfs_gettok(&src, ' ', &res);
                 if (rc == 0) {
@@ -857,12 +857,12 @@ cfs_parse_nidlist(char *str, int len, cfs_list_t *nidlist)
  * \retval 0 otherwise
  */
 static int
-libcfs_num_match(__u32 addr, cfs_list_t *numaddr)
+libcfs_num_match(__u32 addr, struct list_head *numaddr)
 {
 	struct cfs_expr_list *el;
 
-	LASSERT(!cfs_list_empty(numaddr));
-	el = cfs_list_entry(numaddr->next, struct cfs_expr_list, el_link);
+	LASSERT(!list_empty(numaddr));
+	el = list_entry(numaddr->next, struct cfs_expr_list, el_link);
 
 	return cfs_expr_list_match(addr, el);
 }
@@ -875,20 +875,20 @@ libcfs_num_match(__u32 addr, cfs_list_t *numaddr)
  * \retval 1 on match
  * \retval 0  otherwises
  */
-int cfs_match_nid(lnet_nid_t nid, cfs_list_t *nidlist)
+int cfs_match_nid(lnet_nid_t nid, struct list_head *nidlist)
 {
         struct nidrange *nr;
         struct addrrange *ar;
         ENTRY;
 
-        cfs_list_for_each_entry(nr, nidlist, nr_link) {
+        list_for_each_entry(nr, nidlist, nr_link) {
                 if (nr->nr_netstrfns->nf_type != LNET_NETTYP(LNET_NIDNET(nid)))
                         continue;
                 if (nr->nr_netnum != LNET_NETNUM(LNET_NIDNET(nid)))
                         continue;
                 if (nr->nr_all)
                         RETURN(1);
-                cfs_list_for_each_entry(ar, &nr->nr_addrranges, ar_link)
+                list_for_each_entry(ar, &nr->nr_addrranges, ar_link)
                         if (nr->nr_netstrfns->nf_match_addr(LNET_NIDADDR(nid),
                                                        &ar->ar_numaddr_ranges))
                                 RETURN(1);

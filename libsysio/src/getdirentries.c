@@ -51,7 +51,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "inode.h"

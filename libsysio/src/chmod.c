@@ -47,7 +47,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "inode.h"

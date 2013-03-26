@@ -45,6 +45,7 @@
  * Mount support.
  */
 
+#include <sys/queue.h>
 struct filesys;
 struct pnode;
 

@@ -266,7 +266,7 @@ kptllnd_active_rdma(kptl_rx_t *rx, lnet_msg_t *lntmsg, int type,
         tx->tx_deadline = jiffies + (*kptllnd_tunables.kptl_timeout * CFS_HZ);
         tx->tx_rdma_mdh = mdh;
         tx->tx_active = 1;
-        cfs_list_add_tail(&tx->tx_list, &peer->peer_activeq);
+        list_add_tail(&tx->tx_list, &peer->peer_activeq);
 
         /* peer has now got my ref on 'tx' */
 
@@ -755,10 +755,10 @@ kptllnd_scheduler (void *arg)
 
                 did_something = 0;
 
-                if (!cfs_list_empty(&kptllnd_data.kptl_sched_rxq)) {
-                        rx = cfs_list_entry (kptllnd_data.kptl_sched_rxq.next,
+                if (!list_empty(&kptllnd_data.kptl_sched_rxq)) {
+                        rx = list_entry (kptllnd_data.kptl_sched_rxq.next,
                                              kptl_rx_t, rx_list);
-                        cfs_list_del(&rx->rx_list);
+                        list_del(&rx->rx_list);
 
 			spin_unlock_irqrestore(&kptllnd_data. \
                                                    kptl_sched_lock,
@@ -771,11 +771,11 @@ kptllnd_scheduler (void *arg)
                                               flags);
                 }
 
-                if (!cfs_list_empty(&kptllnd_data.kptl_sched_rxbq)) {
-                        rxb = cfs_list_entry (kptllnd_data.kptl_sched_rxbq.next,
+                if (!list_empty(&kptllnd_data.kptl_sched_rxbq)) {
+                        rxb = list_entry (kptllnd_data.kptl_sched_rxbq.next,
                                               kptl_rx_buffer_t,
                                               rxb_repost_list);
-                        cfs_list_del(&rxb->rxb_repost_list);
+                        list_del(&rxb->rxb_repost_list);
 
 			spin_unlock_irqrestore(&kptllnd_data. \
                                                    kptl_sched_lock,
@@ -788,10 +788,10 @@ kptllnd_scheduler (void *arg)
                                               flags);
                 }
 
-                if (!cfs_list_empty(&kptllnd_data.kptl_sched_txq)) {
-                        tx = cfs_list_entry (kptllnd_data.kptl_sched_txq.next,
+                if (!list_empty(&kptllnd_data.kptl_sched_txq)) {
+                        tx = list_entry (kptllnd_data.kptl_sched_txq.next,
                                              kptl_tx_t, tx_list);
-                        cfs_list_del_init(&tx->tx_list);
+                        list_del_init(&tx->tx_list);
 
 			spin_unlock_irqrestore(&kptllnd_data. \
                                                    kptl_sched_lock, flags);

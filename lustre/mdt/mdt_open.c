@@ -65,8 +65,8 @@ struct mdt_file_data *mdt_mfd_new(void)
 
         OBD_ALLOC_PTR(mfd);
         if (mfd != NULL) {
-                CFS_INIT_LIST_HEAD(&mfd->mfd_handle.h_link);
-                CFS_INIT_LIST_HEAD(&mfd->mfd_list);
+                INIT_LIST_HEAD(&mfd->mfd_handle.h_link);
+                INIT_LIST_HEAD(&mfd->mfd_list);
 		class_handle_hash(&mfd->mfd_handle, &mfd_handle_ops);
         }
         RETURN(mfd);
@@ -89,7 +89,7 @@ struct mdt_file_data *mdt_handle2mfd(struct mdt_thread_info *info,
         /* during dw/setattr replay the mfd can be found by old handle */
         if (mfd == NULL && req_is_replay(req)) {
                 struct mdt_export_data *med = &req->rq_export->exp_mdt_data;
-                cfs_list_for_each_entry(mfd, &med->med_open_head, mfd_list) {
+                list_for_each_entry(mfd, &med->med_open_head, mfd_list) {
                         if (mfd->mfd_old_handle.cookie == handle->cookie)
                                 RETURN (mfd);
                 }
@@ -101,7 +101,7 @@ struct mdt_file_data *mdt_handle2mfd(struct mdt_thread_info *info,
 /* free mfd */
 void mdt_mfd_free(struct mdt_file_data *mfd)
 {
-        LASSERT(cfs_list_empty(&mfd->mfd_list));
+        LASSERT(list_empty(&mfd->mfd_list));
         OBD_FREE_RCU(mfd, sizeof *mfd, &mfd->mfd_handle);
 }
 
@@ -762,7 +762,7 @@ static int mdt_mfd_open(struct mdt_thread_info *info, struct mdt_object *p,
                                        info->mti_rr.rr_handle->cookie);
 				spin_lock(&med->med_open_lock);
 				class_handle_unhash(&old_mfd->mfd_handle);
-				cfs_list_del_init(&old_mfd->mfd_list);
+				list_del_init(&old_mfd->mfd_list);
 				spin_unlock(&med->med_open_lock);
                                 /* no attr update for that close */
                                 la->la_valid = 0;
@@ -782,12 +782,12 @@ static int mdt_mfd_open(struct mdt_thread_info *info, struct mdt_object *p,
                 if (req->rq_export->exp_disconnected) {
 			spin_lock(&med->med_open_lock);
 			class_handle_unhash(&mfd->mfd_handle);
-			cfs_list_del_init(&mfd->mfd_list);
+			list_del_init(&mfd->mfd_list);
 			spin_unlock(&med->med_open_lock);
 			mdt_mfd_close(info, mfd);
 		} else {
 			spin_lock(&med->med_open_lock);
-			cfs_list_add(&mfd->mfd_list, &med->med_open_head);
+			list_add(&mfd->mfd_list, &med->med_open_head);
 			spin_unlock(&med->med_open_lock);
                 }
 
@@ -821,7 +821,7 @@ int mdt_finish_open(struct mdt_thread_info *info,
         struct mdt_body         *repbody;
         int                      rc = 0;
         int                      isreg, isdir, islnk;
-        cfs_list_t              *t;
+        struct list_head              *t;
         ENTRY;
 
         LASSERT(ma->ma_valid & MA_INODE);
@@ -947,8 +947,8 @@ int mdt_finish_open(struct mdt_thread_info *info,
         mfd = NULL;
         if (lustre_msg_get_flags(req->rq_reqmsg) & MSG_RESENT) {
 		spin_lock(&med->med_open_lock);
-		cfs_list_for_each(t, &med->med_open_head) {
-			mfd = cfs_list_entry(t, struct mdt_file_data, mfd_list);
+		list_for_each(t, &med->med_open_head) {
+			mfd = list_entry(t, struct mdt_file_data, mfd_list);
 			if (mfd->mfd_xid == req->rq_xid)
 				break;
 			mfd = NULL;
@@ -1796,7 +1796,7 @@ int mdt_mfd_close(struct mdt_thread_info *info, struct mdt_file_data *mfd)
                 LASSERT(mdt_info_req(info));
                 med = &mdt_info_req(info)->rq_export->exp_mdt_data;
 		spin_lock(&med->med_open_lock);
-		cfs_list_add(&mfd->mfd_list, &med->med_open_head);
+		list_add(&mfd->mfd_list, &med->med_open_head);
 		class_handle_hash_back(&mfd->mfd_handle);
 		spin_unlock(&med->med_open_lock);
 
@@ -1880,7 +1880,7 @@ int mdt_close(struct mdt_thread_info *info)
 		rc = -ESTALE;
 	} else {
 		class_handle_unhash(&mfd->mfd_handle);
-		cfs_list_del_init(&mfd->mfd_list);
+		list_del_init(&mfd->mfd_list);
 		spin_unlock(&med->med_open_lock);
 
                 /* Do not lose object before last unlink. */
@@ -1966,7 +1966,7 @@ int mdt_done_writing(struct mdt_thread_info *info)
         LASSERT(mfd->mfd_mode == MDS_FMODE_EPOCH ||
                 mfd->mfd_mode == MDS_FMODE_TRUNC);
         class_handle_unhash(&mfd->mfd_handle);
-        cfs_list_del_init(&mfd->mfd_list);
+        list_del_init(&mfd->mfd_list);
 	spin_unlock(&med->med_open_lock);
 
         /* Set EPOCH CLOSE flag if not set by client. */

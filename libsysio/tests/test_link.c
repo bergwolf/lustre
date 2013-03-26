@@ -52,7 +52,6 @@
 #include <dirent.h>
 #endif
 #include <sys/uio.h>
-#include <sys/queue.h>
 #include <getopt.h>
 
 #if defined(SYSIO_LABEL_NAMES)

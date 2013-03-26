@@ -55,7 +55,7 @@ static void lov_init_set(struct lov_request_set *set)
 	cfs_atomic_set(&set->set_success, 0);
 	cfs_atomic_set(&set->set_finish_checked, 0);
 	set->set_cookies = 0;
-	CFS_INIT_LIST_HEAD(&set->set_list);
+	INIT_LIST_HEAD(&set->set_list);
 	cfs_atomic_set(&set->set_refcount, 1);
 	cfs_waitq_init(&set->set_waitq);
 	spin_lock_init(&set->set_lock);
@@ -63,15 +63,15 @@ static void lov_init_set(struct lov_request_set *set)
 
 void lov_finish_set(struct lov_request_set *set)
 {
-        cfs_list_t *pos, *n;
+        struct list_head *pos, *n;
         ENTRY;
 
         LASSERT(set);
-        cfs_list_for_each_safe(pos, n, &set->set_list) {
-                struct lov_request *req = cfs_list_entry(pos,
+        list_for_each_safe(pos, n, &set->set_list) {
+                struct lov_request *req = list_entry(pos,
                                                          struct lov_request,
                                                          rq_link);
-                cfs_list_del_init(&req->rq_link);
+                list_del_init(&req->rq_link);
 
                 if (req->rq_oi.oi_oa)
                         OBDO_FREE(req->rq_oi.oi_oa);
@@ -141,7 +141,7 @@ int lov_update_common_set(struct lov_request_set *set,
 
 void lov_set_add_req(struct lov_request *req, struct lov_request_set *set)
 {
-        cfs_list_add_tail(&req->rq_link, &set->set_list);
+        list_add_tail(&req->rq_link, &set->set_list);
         set->set_count++;
         req->rq_rqset = set;
 }
@@ -228,7 +228,7 @@ static int enqueue_done(struct lov_request_set *set, __u32 mode)
                 RETURN(0);
 
         /* cancel enqueued/matched locks */
-        cfs_list_for_each_entry(req, &set->set_list, rq_link) {
+        list_for_each_entry(req, &set->set_list, rq_link) {
                 struct lustre_handle *lov_lockhp;
 
                 if (!req->rq_complete || req->rq_rc)
@@ -301,7 +301,7 @@ static struct lov_lock_handles *lov_llh_new(struct lov_stripe_md *lsm)
 
 	cfs_atomic_set(&llh->llh_refcount, 2);
 	llh->llh_stripe_count = lsm->lsm_stripe_count;
-	CFS_INIT_LIST_HEAD(&llh->llh_handle.h_link);
+	INIT_LIST_HEAD(&llh->llh_handle.h_link);
 	class_handle_hash(&llh->llh_handle, &lov_handle_ops);
 
 	return llh;
@@ -574,7 +574,7 @@ out_set:
 }
 static int common_attr_done(struct lov_request_set *set)
 {
-        cfs_list_t *pos;
+        struct list_head *pos;
         struct lov_request *req;
         struct obdo *tmp_oa;
         int rc = 0, attrset = 0;
@@ -592,8 +592,8 @@ static int common_attr_done(struct lov_request_set *set)
         if (tmp_oa == NULL)
                 GOTO(out, rc = -ENOMEM);
 
-        cfs_list_for_each (pos, &set->set_list) {
-                req = cfs_list_entry(pos, struct lov_request, rq_link);
+        list_for_each (pos, &set->set_list) {
+                req = list_entry(pos, struct lov_request, rq_link);
 
                 if (!req->rq_complete || req->rq_rc)
                         continue;
@@ -628,12 +628,12 @@ static int brw_done(struct lov_request_set *set)
 {
         struct lov_stripe_md *lsm = set->set_oi->oi_md;
         struct lov_oinfo     *loi = NULL;
-        cfs_list_t *pos;
+        struct list_head *pos;
         struct lov_request *req;
         ENTRY;
 
-        cfs_list_for_each (pos, &set->set_list) {
-                req = cfs_list_entry(pos, struct lov_request, rq_link);
+        list_for_each (pos, &set->set_list) {
+                req = list_entry(pos, struct lov_request, rq_link);
 
                 if (!req->rq_complete || req->rq_rc)
                         continue;

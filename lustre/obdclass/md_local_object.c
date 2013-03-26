@@ -53,7 +53,7 @@
 
 
 /** List head to hold list of objects to be created. */
-static cfs_list_t llo_lobj_list;
+static struct list_head llo_lobj_list;
 
 /** Lock to protect list manipulations */
 static struct mutex	llo_lock;
@@ -374,7 +374,7 @@ EXPORT_SYMBOL(llo_store_create);
 void llo_local_obj_register(struct lu_local_obj_desc *llod)
 {
 	mutex_lock(&llo_lock);
-        cfs_list_add_tail(&llod->llod_linkage, &llo_lobj_list);
+        list_add_tail(&llod->llod_linkage, &llo_lobj_list);
 	mutex_unlock(&llo_lock);
 }
 
@@ -383,7 +383,7 @@ EXPORT_SYMBOL(llo_local_obj_register);
 void llo_local_obj_unregister(struct lu_local_obj_desc *llod)
 {
 	mutex_lock(&llo_lock);
-        cfs_list_del(&llod->llod_linkage);
+        list_del(&llod->llod_linkage);
 	mutex_unlock(&llo_lock);
 }
 
@@ -407,7 +407,7 @@ int llo_local_objects_setup(const struct lu_env *env,
         fid = &info->lti_cfid;
 	mutex_lock(&llo_lock);
 
-        cfs_list_for_each_entry(scan, &llo_lobj_list, llod_linkage) {
+        list_for_each_entry(scan, &llo_lobj_list, llod_linkage) {
                 lu_local_obj_fid(fid, scan->llod_oid);
                 dir = "";
                 if (scan->llod_dir)
@@ -444,7 +444,7 @@ int llo_global_init(void)
 {
         int result;
 
-        CFS_INIT_LIST_HEAD(&llo_lobj_list);
+        INIT_LIST_HEAD(&llo_lobj_list);
 	mutex_init(&llo_lock);
 
         LU_CONTEXT_KEY_INIT(&llod_key);
@@ -455,5 +455,5 @@ int llo_global_init(void)
 void llo_global_fini(void)
 {
         lu_context_key_degister(&llod_key);
-        LASSERT(cfs_list_empty(&llo_lobj_list));
+        LASSERT(list_empty(&llo_lobj_list));
 }

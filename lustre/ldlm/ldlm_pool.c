@@ -1096,7 +1096,7 @@ static int ldlm_pools_shrink(ldlm_side_t client, int nr,
              nr_ns > 0; nr_ns--)
         {
 		mutex_lock(ldlm_namespace_lock(client));
-                if (cfs_list_empty(ldlm_namespace_list(client))) {
+                if (list_empty(ldlm_namespace_list(client))) {
 			mutex_unlock(ldlm_namespace_lock(client));
                         cl_env_reexit(cookie);
                         return 0;
@@ -1126,7 +1126,7 @@ static int ldlm_pools_shrink(ldlm_side_t client, int nr,
                  * Do not call shrink under ldlm_namespace_lock(client)
                  */
 		mutex_lock(ldlm_namespace_lock(client));
-                if (cfs_list_empty(ldlm_namespace_list(client))) {
+                if (list_empty(ldlm_namespace_list(client))) {
 			mutex_unlock(ldlm_namespace_lock(client));
                         /*
                          * If list is empty, we can't return any @cached > 0,
@@ -1181,7 +1181,7 @@ void ldlm_pools_recalc(ldlm_side_t client)
                  * Check all modest namespaces first.
                  */
 		mutex_lock(ldlm_namespace_lock(client));
-                cfs_list_for_each_entry(ns, ldlm_namespace_list(client),
+                list_for_each_entry(ns, ldlm_namespace_list(client),
                                         ns_list_chain)
                 {
                         if (ns->ns_appetite != LDLM_NAMESPACE_MODEST)
@@ -1216,7 +1216,7 @@ void ldlm_pools_recalc(ldlm_side_t client)
                 /*
                  * The rest is given to greedy namespaces.
                  */
-                cfs_list_for_each_entry(ns, ldlm_namespace_list(client),
+                list_for_each_entry(ns, ldlm_namespace_list(client),
                                         ns_list_chain)
                 {
                         if (!equal && ns->ns_appetite != LDLM_NAMESPACE_GREEDY)
@@ -1259,7 +1259,7 @@ void ldlm_pools_recalc(ldlm_side_t client)
                  * locks synchronously.
                  */
 		mutex_lock(ldlm_namespace_lock(client));
-		if (cfs_list_empty(ldlm_namespace_list(client))) {
+		if (list_empty(ldlm_namespace_list(client))) {
 			mutex_unlock(ldlm_namespace_lock(client));
 			break;
 		}

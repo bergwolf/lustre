@@ -103,9 +103,13 @@ static inline int __is_po2(unsigned long long val)
 
 #define LUSTRE_SRV_LNET_PID      LUSTRE_LNET_PID
 
-#ifdef __KERNEL__
-
+#if defined(__KERNEL__) && defined(__linux__)
+#include <linux/list.h>
+#else
 #include <libcfs/list.h>
+#endif
+
+#ifdef __KERNEL__
 
 #ifndef cfs_for_each_possible_cpu
 #  error cfs_for_each_possible_cpu is not supported by kernel!

@@ -134,7 +134,7 @@ static struct update_request
 		return ERR_PTR(-ENOMEM);
 	}
 
-	CFS_INIT_LIST_HEAD(&update->ur_list);
+	INIT_LIST_HEAD(&update->ur_list);
 	update->ur_dt = dt;
 	update->ur_batchid = 0;
 	update->ur_buf->ub_magic = UPDATE_BUFFER_MAGIC;
@@ -148,7 +148,7 @@ static void osp_destroy_update_req(struct update_request *update)
 	if (update == NULL)
 		return;
 
-	cfs_list_del(&update->ur_list);
+	list_del(&update->ur_list);
 	if (update->ur_buf != NULL)
 		OBD_FREE_LARGE(update->ur_buf, UPDATE_BUFFER_SIZE);
 
@@ -264,7 +264,7 @@ static struct update_request
 	 * remote update list to find the update, this probably
 	 * should move to LOD layer, when update can be part of
 	 * the trancation api parameter. XXX */
-	cfs_list_for_each_entry(update, &th->th_remote_update_list, ur_list) {
+	list_for_each_entry(update, &th->th_remote_update_list, ur_list) {
 		if (update->ur_dt == dt_dev)
 			return update;
 	}
@@ -296,7 +296,7 @@ static struct update_request
 	if (IS_ERR(update))
 		RETURN(update);
 
-	cfs_list_add_tail(&update->ur_list, &th->th_remote_update_list);
+	list_add_tail(&update->ur_list, &th->th_remote_update_list);
 
 	RETURN(update);
 }

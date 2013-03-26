@@ -163,7 +163,7 @@ int llog_cat_id2handle(const struct lu_env *env, struct llog_handle *cathandle,
 		RETURN(-EBADF);
 
 	down_write(&cathandle->lgh_lock);
-	cfs_list_for_each_entry(loghandle, &cathandle->u.chd.chd_head,
+	list_for_each_entry(loghandle, &cathandle->u.chd.chd_head,
 				u.phd.phd_entry) {
 		struct llog_logid *cgl = &loghandle->lgh_id;
 
@@ -199,7 +199,7 @@ int llog_cat_id2handle(const struct lu_env *env, struct llog_handle *cathandle,
 	}
 
 	down_write(&cathandle->lgh_lock);
-	cfs_list_add(&loghandle->u.phd.phd_entry, &cathandle->u.chd.chd_head);
+	list_add(&loghandle->u.phd.phd_entry, &cathandle->u.chd.chd_head);
 	up_write(&cathandle->lgh_lock);
 
 	loghandle->u.phd.phd_cat_handle = cathandle;
@@ -220,13 +220,13 @@ int llog_cat_close(const struct lu_env *env, struct llog_handle *cathandle)
 
 	ENTRY;
 
-	cfs_list_for_each_entry_safe(loghandle, n, &cathandle->u.chd.chd_head,
+	list_for_each_entry_safe(loghandle, n, &cathandle->u.chd.chd_head,
 				     u.phd.phd_entry) {
 		struct llog_log_hdr	*llh = loghandle->lgh_hdr;
 		int			 index;
 
 		/* unlink open-not-created llogs */
-		cfs_list_del_init(&loghandle->u.phd.phd_entry);
+		list_del_init(&loghandle->u.phd.phd_entry);
 		llh = loghandle->lgh_hdr;
 		if (loghandle->lgh_obj != NULL && llh != NULL &&
 		    (llh->llh_flags & LLOG_F_ZAP_WHEN_EMPTY) &&
@@ -394,7 +394,7 @@ int llog_cat_declare_add_rec(const struct lu_env *env,
 				       NULL, NULL, LLOG_OPEN_NEW);
 			if (rc == 0) {
 				cathandle->u.chd.chd_current_log = loghandle;
-				cfs_list_add_tail(&loghandle->u.phd.phd_entry,
+				list_add_tail(&loghandle->u.phd.phd_entry,
 						  &cathandle->u.chd.chd_head);
 			}
 		}
@@ -407,7 +407,7 @@ int llog_cat_declare_add_rec(const struct lu_env *env,
 				       NULL, NULL, LLOG_OPEN_NEW);
 			if (rc == 0) {
 				cathandle->u.chd.chd_next_log = loghandle;
-				cfs_list_add_tail(&loghandle->u.phd.phd_entry,
+				list_add_tail(&loghandle->u.phd.phd_entry,
 						  &cathandle->u.chd.chd_head);
 			}
 		}
@@ -751,7 +751,7 @@ int llog_cat_cleanup(const struct lu_env *env, struct llog_handle *cathandle,
 		down_write(&cathandle->lgh_lock);
 		if (cathandle->u.chd.chd_current_log == loghandle)
 			cathandle->u.chd.chd_current_log = NULL;
-		cfs_list_del_init(&loghandle->u.phd.phd_entry);
+		list_del_init(&loghandle->u.phd.phd_entry);
 		up_write(&cathandle->lgh_lock);
 		LASSERT(index == loghandle->u.phd.phd_cookie.lgc_index);
 		/* llog was opened and keep in a list, close it now */

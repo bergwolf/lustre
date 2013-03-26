@@ -197,7 +197,7 @@ typedef struct {
 #  if !KLWT_SUPPORT
 
 typedef struct _lwt_page {
-        cfs_list_t               lwtp_list;
+        struct list_head               lwtp_list;
         struct page             *lwtp_page;
         lwt_event_t             *lwtp_events;
 } lwt_page_t;
@@ -234,7 +234,7 @@ do {                                                                    \
                                                                         \
                 if (cpu->lwtc_current_index >= LWT_EVENTS_PER_PAGE) {   \
                         cpu->lwtc_current_page =                        \
-                                cfs_list_entry (p->lwtp_list.next,      \
+                                list_entry (p->lwtp_list.next,      \
                                                 lwt_page_t, lwtp_list); \
                         cpu->lwtc_current_index = 0;                    \
                 }                                                       \

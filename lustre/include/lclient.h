@@ -189,7 +189,7 @@ struct ccc_object {
          *
          * \see ccc_page::cpg_pending_linkage
          */
-        cfs_list_t             cob_pending_list;
+        struct list_head             cob_pending_list;
 
         /**
          * Access this counter is protected by inode->i_sem. Now that
@@ -232,7 +232,7 @@ struct ccc_page {
          * that is, never iterated through, only checked for list_empty(), but
          * having a list is useful for debugging.
          */
-        cfs_list_t           cpg_pending_linkage;
+        struct list_head           cpg_pending_linkage;
         /** VM page */
         cfs_page_t          *cpg_page;
 };
@@ -439,7 +439,7 @@ void ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm);
  */
 struct cl_client_cache {
 	cfs_atomic_t	ccc_users;    /* # of users (OSCs) of this data */
-	cfs_list_t	ccc_lru;      /* LRU list of cached clean pages */
+	struct list_head	ccc_lru;      /* LRU list of cached clean pages */
 	spinlock_t	ccc_lru_lock; /* lock for list */
 	cfs_atomic_t	ccc_lru_left; /* # of LRU entries available */
 	unsigned long	ccc_lru_max;  /* Max # of LRU entries possible */

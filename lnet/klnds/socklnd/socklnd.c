@@ -124,10 +124,10 @@ ksocknal_create_peer (ksock_peer_t **peerp, lnet_ni_t *ni, lnet_process_id_t id)
         peer->ksnp_last_alive = 0;
         peer->ksnp_zc_next_cookie = SOCKNAL_KEEPALIVE_PING + 1;
 
-        CFS_INIT_LIST_HEAD (&peer->ksnp_conns);
-        CFS_INIT_LIST_HEAD (&peer->ksnp_routes);
-        CFS_INIT_LIST_HEAD (&peer->ksnp_tx_queue);
-        CFS_INIT_LIST_HEAD (&peer->ksnp_zc_req_list);
+        INIT_LIST_HEAD (&peer->ksnp_conns);
+        INIT_LIST_HEAD (&peer->ksnp_routes);
+        INIT_LIST_HEAD (&peer->ksnp_tx_queue);
+        INIT_LIST_HEAD (&peer->ksnp_zc_req_list);
 	spin_lock_init(&peer->ksnp_lock);
 
 	spin_lock_bh(&net->ksnn_lock);
@@ -158,10 +158,10 @@ ksocknal_destroy_peer (ksock_peer_t *peer)
 
         LASSERT (cfs_atomic_read (&peer->ksnp_refcount) == 0);
         LASSERT (peer->ksnp_accepting == 0);
-        LASSERT (cfs_list_empty (&peer->ksnp_conns));
-        LASSERT (cfs_list_empty (&peer->ksnp_routes));
-        LASSERT (cfs_list_empty (&peer->ksnp_tx_queue));
-        LASSERT (cfs_list_empty (&peer->ksnp_zc_req_list));
+        LASSERT (list_empty (&peer->ksnp_conns));
+        LASSERT (list_empty (&peer->ksnp_routes));
+        LASSERT (list_empty (&peer->ksnp_tx_queue));
+        LASSERT (list_empty (&peer->ksnp_zc_req_list));
 
         LIBCFS_FREE (peer, sizeof (*peer));
 
@@ -177,13 +177,13 @@ ksocknal_destroy_peer (ksock_peer_t *peer)
 ksock_peer_t *
 ksocknal_find_peer_locked (lnet_ni_t *ni, lnet_process_id_t id)
 {
-        cfs_list_t       *peer_list = ksocknal_nid2peerlist(id.nid);
-        cfs_list_t       *tmp;
+        struct list_head       *peer_list = ksocknal_nid2peerlist(id.nid);
+        struct list_head       *tmp;
         ksock_peer_t     *peer;
 
-        cfs_list_for_each (tmp, peer_list) {
+        list_for_each (tmp, peer_list) {
 
-                peer = cfs_list_entry (tmp, ksock_peer_t, ksnp_list);
+                peer = list_entry (tmp, ksock_peer_t, ksnp_list);
 
                 LASSERT (!peer->ksnp_closing);
 
@@ -237,11 +237,11 @@ ksocknal_unlink_peer_locked (ksock_peer_t *peer)
                 iface->ksni_npeers--;
         }
 
-        LASSERT (cfs_list_empty(&peer->ksnp_conns));
-        LASSERT (cfs_list_empty(&peer->ksnp_routes));
+        LASSERT (list_empty(&peer->ksnp_conns));
+        LASSERT (list_empty(&peer->ksnp_routes));
         LASSERT (!peer->ksnp_closing);
         peer->ksnp_closing = 1;
-        cfs_list_del (&peer->ksnp_list);
+        list_del (&peer->ksnp_list);
         /* lose peerlist's ref */
         ksocknal_peer_decref(peer);
 }
@@ -252,9 +252,9 @@ ksocknal_get_peer_info (lnet_ni_t *ni, int index,
                         int *port, int *conn_count, int *share_count)
 {
         ksock_peer_t      *peer;
-        cfs_list_t        *ptmp;
+        struct list_head        *ptmp;
         ksock_route_t     *route;
-        cfs_list_t        *rtmp;
+        struct list_head        *rtmp;
         int                i;
         int                j;
         int                rc = -ENOENT;
@@ -263,14 +263,14 @@ ksocknal_get_peer_info (lnet_ni_t *ni, int index,
 
         for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
 
-                cfs_list_for_each (ptmp, &ksocknal_data.ksnd_peers[i]) {
-                        peer = cfs_list_entry (ptmp, ksock_peer_t, ksnp_list);
+                list_for_each (ptmp, &ksocknal_data.ksnd_peers[i]) {
+                        peer = list_entry (ptmp, ksock_peer_t, ksnp_list);
 
                         if (peer->ksnp_ni != ni)
                                 continue;
 
                         if (peer->ksnp_n_passive_ips == 0 &&
-                            cfs_list_empty(&peer->ksnp_routes)) {
+                            list_empty(&peer->ksnp_routes)) {
                                 if (index-- > 0)
                                         continue;
 
@@ -298,11 +298,11 @@ ksocknal_get_peer_info (lnet_ni_t *ni, int index,
                                 goto out;
                         }
 
-                        cfs_list_for_each (rtmp, &peer->ksnp_routes) {
+                        list_for_each (rtmp, &peer->ksnp_routes) {
                                 if (index-- > 0)
                                         continue;
 
-                                route = cfs_list_entry(rtmp, ksock_route_t,
+                                route = list_entry(rtmp, ksock_route_t,
                                                        ksnr_list);
 
                                 *id = peer->ksnp_id;
@@ -369,7 +369,7 @@ ksocknal_associate_route_conn_locked(ksock_route_t *route, ksock_conn_t *conn)
 void
 ksocknal_add_route_locked (ksock_peer_t *peer, ksock_route_t *route)
 {
-        cfs_list_t        *tmp;
+        struct list_head        *tmp;
         ksock_conn_t      *conn;
         ksock_route_t     *route2;
 
@@ -380,8 +380,8 @@ ksocknal_add_route_locked (ksock_peer_t *peer, ksock_route_t *route)
         LASSERT (route->ksnr_connected == 0);
 
         /* LASSERT(unique) */
-        cfs_list_for_each(tmp, &peer->ksnp_routes) {
-                route2 = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+        list_for_each(tmp, &peer->ksnp_routes) {
+                route2 = list_entry(tmp, ksock_route_t, ksnr_list);
 
                 if (route2->ksnr_ipaddr == route->ksnr_ipaddr) {
                         CERROR ("Duplicate route %s %u.%u.%u.%u\n",
@@ -394,10 +394,10 @@ ksocknal_add_route_locked (ksock_peer_t *peer, ksock_route_t *route)
         route->ksnr_peer = peer;
         ksocknal_peer_addref(peer);
         /* peer's routelist takes over my ref on 'route' */
-        cfs_list_add_tail(&route->ksnr_list, &peer->ksnp_routes);
+        list_add_tail(&route->ksnr_list, &peer->ksnp_routes);
 
-        cfs_list_for_each(tmp, &peer->ksnp_conns) {
-                conn = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+        list_for_each(tmp, &peer->ksnp_conns) {
+                conn = list_entry(tmp, ksock_conn_t, ksnc_list);
 
                 if (conn->ksnc_ipaddr != route->ksnr_ipaddr)
                         continue;
@@ -413,14 +413,14 @@ ksocknal_del_route_locked (ksock_route_t *route)
         ksock_peer_t      *peer = route->ksnr_peer;
         ksock_interface_t *iface;
         ksock_conn_t      *conn;
-        cfs_list_t        *ctmp;
-        cfs_list_t        *cnxt;
+        struct list_head        *ctmp;
+        struct list_head        *cnxt;
 
         LASSERT (!route->ksnr_deleted);
 
         /* Close associated conns */
-        cfs_list_for_each_safe (ctmp, cnxt, &peer->ksnp_conns) {
-                conn = cfs_list_entry(ctmp, ksock_conn_t, ksnc_list);
+        list_for_each_safe (ctmp, cnxt, &peer->ksnp_conns) {
+                conn = list_entry(ctmp, ksock_conn_t, ksnc_list);
 
                 if (conn->ksnc_route != route)
                         continue;
@@ -436,11 +436,11 @@ ksocknal_del_route_locked (ksock_route_t *route)
         }
 
         route->ksnr_deleted = 1;
-        cfs_list_del (&route->ksnr_list);
+        list_del (&route->ksnr_list);
         ksocknal_route_decref(route);             /* drop peer's ref */
 
-        if (cfs_list_empty (&peer->ksnp_routes) &&
-            cfs_list_empty (&peer->ksnp_conns)) {
+        if (list_empty (&peer->ksnp_routes) &&
+            list_empty (&peer->ksnp_conns)) {
                 /* I've just removed the last route to a peer with no active
                  * connections */
                 ksocknal_unlink_peer_locked (peer);
@@ -450,7 +450,7 @@ ksocknal_del_route_locked (ksock_route_t *route)
 int
 ksocknal_add_peer (lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
 {
-        cfs_list_t        *tmp;
+        struct list_head        *tmp;
         ksock_peer_t      *peer;
         ksock_peer_t      *peer2;
         ksock_route_t     *route;
@@ -483,13 +483,13 @@ ksocknal_add_peer (lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
                 peer = peer2;
         } else {
                 /* peer table takes my ref on peer */
-                cfs_list_add_tail (&peer->ksnp_list,
+                list_add_tail (&peer->ksnp_list,
                                    ksocknal_nid2peerlist (id.nid));
         }
 
         route2 = NULL;
-        cfs_list_for_each (tmp, &peer->ksnp_routes) {
-                route2 = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+        list_for_each (tmp, &peer->ksnp_routes) {
+                route2 = list_entry(tmp, ksock_route_t, ksnr_list);
 
                 if (route2->ksnr_ipaddr == ipaddr)
                         break;
@@ -514,8 +514,8 @@ ksocknal_del_peer_locked (ksock_peer_t *peer, __u32 ip)
 {
         ksock_conn_t     *conn;
         ksock_route_t    *route;
-        cfs_list_t       *tmp;
-        cfs_list_t       *nxt;
+        struct list_head       *tmp;
+        struct list_head       *nxt;
         int               nshared;
 
         LASSERT (!peer->ksnp_closing);
@@ -523,8 +523,8 @@ ksocknal_del_peer_locked (ksock_peer_t *peer, __u32 ip)
         /* Extra ref prevents peer disappearing until I'm done with it */
         ksocknal_peer_addref(peer);
 
-        cfs_list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
-                route = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+        list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
+                route = list_entry(tmp, ksock_route_t, ksnr_list);
 
                 /* no match */
                 if (!(ip == 0 || route->ksnr_ipaddr == ip))
@@ -536,8 +536,8 @@ ksocknal_del_peer_locked (ksock_peer_t *peer, __u32 ip)
         }
 
         nshared = 0;
-        cfs_list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
-                route = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+        list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
+                route = list_entry(tmp, ksock_route_t, ksnr_list);
                 nshared += route->ksnr_share_count;
         }
 
@@ -545,16 +545,16 @@ ksocknal_del_peer_locked (ksock_peer_t *peer, __u32 ip)
                 /* remove everything else if there are no explicit entries
                  * left */
 
-                cfs_list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
-                        route = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+                list_for_each_safe (tmp, nxt, &peer->ksnp_routes) {
+                        route = list_entry(tmp, ksock_route_t, ksnr_list);
 
                         /* we should only be removing auto-entries */
                         LASSERT(route->ksnr_share_count == 0);
                         ksocknal_del_route_locked (route);
                 }
 
-                cfs_list_for_each_safe (tmp, nxt, &peer->ksnp_conns) {
-                        conn = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+                list_for_each_safe (tmp, nxt, &peer->ksnp_conns) {
+                        conn = list_entry(tmp, ksock_conn_t, ksnc_list);
 
                         ksocknal_close_conn_locked(conn, 0);
                 }
@@ -567,9 +567,9 @@ ksocknal_del_peer_locked (ksock_peer_t *peer, __u32 ip)
 int
 ksocknal_del_peer (lnet_ni_t *ni, lnet_process_id_t id, __u32 ip)
 {
-        CFS_LIST_HEAD     (zombies);
-        cfs_list_t        *ptmp;
-        cfs_list_t        *pnxt;
+        LIST_HEAD     (zombies);
+        struct list_head        *ptmp;
+        struct list_head        *pnxt;
         ksock_peer_t      *peer;
         int                lo;
         int                hi;
@@ -586,9 +586,9 @@ ksocknal_del_peer (lnet_ni_t *ni, lnet_process_id_t id, __u32 ip)
         }
 
         for (i = lo; i <= hi; i++) {
-                cfs_list_for_each_safe (ptmp, pnxt,
+                list_for_each_safe (ptmp, pnxt,
                                         &ksocknal_data.ksnd_peers[i]) {
-                        peer = cfs_list_entry (ptmp, ksock_peer_t, ksnp_list);
+                        peer = list_entry (ptmp, ksock_peer_t, ksnp_list);
 
                         if (peer->ksnp_ni != ni)
                                 continue;
@@ -602,11 +602,11 @@ ksocknal_del_peer (lnet_ni_t *ni, lnet_process_id_t id, __u32 ip)
                         ksocknal_del_peer_locked (peer, ip);
 
                         if (peer->ksnp_closing &&
-                            !cfs_list_empty(&peer->ksnp_tx_queue)) {
-                                LASSERT (cfs_list_empty(&peer->ksnp_conns));
-                                LASSERT (cfs_list_empty(&peer->ksnp_routes));
+                            !list_empty(&peer->ksnp_tx_queue)) {
+                                LASSERT (list_empty(&peer->ksnp_conns));
+                                LASSERT (list_empty(&peer->ksnp_routes));
 
-                                cfs_list_splice_init(&peer->ksnp_tx_queue,
+                                list_splice_init(&peer->ksnp_tx_queue,
                                                      &zombies);
                         }
 
@@ -627,27 +627,27 @@ ksock_conn_t *
 ksocknal_get_conn_by_idx (lnet_ni_t *ni, int index)
 {
         ksock_peer_t      *peer;
-        cfs_list_t        *ptmp;
+        struct list_head        *ptmp;
         ksock_conn_t      *conn;
-        cfs_list_t        *ctmp;
+        struct list_head        *ctmp;
         int                i;
 
 	read_lock(&ksocknal_data.ksnd_global_lock);
 
         for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
-                cfs_list_for_each (ptmp, &ksocknal_data.ksnd_peers[i]) {
-                        peer = cfs_list_entry (ptmp, ksock_peer_t, ksnp_list);
+                list_for_each (ptmp, &ksocknal_data.ksnd_peers[i]) {
+                        peer = list_entry (ptmp, ksock_peer_t, ksnp_list);
 
                         LASSERT (!peer->ksnp_closing);
 
                         if (peer->ksnp_ni != ni)
                                 continue;
 
-                        cfs_list_for_each (ctmp, &peer->ksnp_conns) {
+                        list_for_each (ctmp, &peer->ksnp_conns) {
                                 if (index-- > 0)
                                         continue;
 
-                                conn = cfs_list_entry (ctmp, ksock_conn_t,
+                                conn = list_entry (ctmp, ksock_conn_t,
                                                        ksnc_list);
                                 ksocknal_conn_addref(conn);
 				read_unlock(&ksocknal_data. \
@@ -858,7 +858,7 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
 	rwlock_t		*global_lock = &ksocknal_data.ksnd_global_lock;
         lnet_ni_t           *ni = peer->ksnp_ni;
         ksock_net_t         *net = ni->ni_data;
-        cfs_list_t          *rtmp;
+        struct list_head          *rtmp;
         ksock_route_t       *route;
         ksock_interface_t   *iface;
         ksock_interface_t   *best_iface;
@@ -904,8 +904,8 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
 
                 /* Already got a route? */
                 route = NULL;
-                cfs_list_for_each(rtmp, &peer->ksnp_routes) {
-                        route = cfs_list_entry(rtmp, ksock_route_t, ksnr_list);
+                list_for_each(rtmp, &peer->ksnp_routes) {
+                        route = list_entry(rtmp, ksock_route_t, ksnr_list);
 
                         if (route->ksnr_ipaddr == newroute->ksnr_ipaddr)
                                 break;
@@ -926,8 +926,8 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
                         iface = &net->ksnn_interfaces[j];
 
                         /* Using this interface already? */
-                        cfs_list_for_each(rtmp, &peer->ksnp_routes) {
-                                route = cfs_list_entry(rtmp, ksock_route_t,
+                        list_for_each(rtmp, &peer->ksnp_routes) {
+                                route = list_entry(rtmp, ksock_route_t,
                                                        ksnr_list);
 
                                 if (route->ksnr_myipaddr == iface->ksni_ipaddr)
@@ -993,7 +993,7 @@ ksocknal_accept (lnet_ni_t *ni, cfs_socket_t *sock)
 
 	spin_lock_bh(&ksocknal_data.ksnd_connd_lock);
 
-        cfs_list_add_tail(&cr->ksncr_list, &ksocknal_data.ksnd_connd_connreqs);
+        list_add_tail(&cr->ksncr_list, &ksocknal_data.ksnd_connd_connreqs);
         cfs_waitq_signal(&ksocknal_data.ksnd_connd_waitq);
 
 	spin_unlock_bh(&ksocknal_data.ksnd_connd_lock);
@@ -1005,8 +1005,7 @@ ksocknal_connecting (ksock_peer_t *peer, __u32 ipaddr)
 {
         ksock_route_t   *route;
 
-        cfs_list_for_each_entry_typed (route, &peer->ksnp_routes,
-                                       ksock_route_t, ksnr_list) {
+        list_for_each_entry (route, &peer->ksnp_routes, ksnr_list) {
 
                 if (route->ksnr_ipaddr == ipaddr)
                         return route->ksnr_connecting;
@@ -1019,9 +1018,9 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
                       cfs_socket_t *sock, int type)
 {
 	rwlock_t		*global_lock = &ksocknal_data.ksnd_global_lock;
-        CFS_LIST_HEAD     (zombies);
+        LIST_HEAD     (zombies);
         lnet_process_id_t  peerid;
-        cfs_list_t        *tmp;
+        struct list_head        *tmp;
         __u64              incarnation;
         ksock_conn_t      *conn;
         ksock_conn_t      *conn2;
@@ -1061,7 +1060,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
         conn->ksnc_rx_ready = 0;
         conn->ksnc_rx_scheduled = 0;
 
-        CFS_INIT_LIST_HEAD (&conn->ksnc_tx_queue);
+        INIT_LIST_HEAD (&conn->ksnc_tx_queue);
         conn->ksnc_tx_ready = 0;
         conn->ksnc_tx_scheduled = 0;
         conn->ksnc_tx_carrier = NULL;
@@ -1144,7 +1143,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
                 if (peer2 == NULL) {
                         /* NB this puts an "empty" peer in the peer
                          * table (which takes my ref) */
-                        cfs_list_add_tail(&peer->ksnp_list,
+                        list_add_tail(&peer->ksnp_list,
                                           ksocknal_nid2peerlist(peerid.nid));
                 } else {
                         ksocknal_peer_decref(peer);
@@ -1178,7 +1177,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
                  * NB recv_hello may have returned EPROTO to signal my peer
                  * wants a different protocol than the one I asked for.
                  */
-                LASSERT (cfs_list_empty(&peer->ksnp_conns));
+                LASSERT (list_empty(&peer->ksnp_conns));
 
                 peer->ksnp_proto = conn->ksnc_proto;
                 peer->ksnp_incarnation = incarnation;
@@ -1213,8 +1212,8 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
         /* Refuse to duplicate an existing connection, unless this is a
          * loopback connection */
         if (conn->ksnc_ipaddr != conn->ksnc_myipaddr) {
-                cfs_list_for_each(tmp, &peer->ksnp_conns) {
-                        conn2 = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+                list_for_each(tmp, &peer->ksnp_conns) {
+                        conn2 = list_entry(tmp, ksock_conn_t, ksnc_list);
 
                         if (conn2->ksnc_ipaddr != conn->ksnc_ipaddr ||
                             conn2->ksnc_myipaddr != conn->ksnc_myipaddr ||
@@ -1247,8 +1246,8 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
          * create an association.  This allows incoming connections created
          * by routes in my peer to match my own route entries so I don't
          * continually create duplicate routes. */
-        cfs_list_for_each (tmp, &peer->ksnp_routes) {
-                route = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+        list_for_each (tmp, &peer->ksnp_routes) {
+                route = list_entry(tmp, ksock_route_t, ksnr_list);
 
                 if (route->ksnr_ipaddr != conn->ksnc_ipaddr)
                         continue;
@@ -1272,7 +1271,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
         conn->ksnc_tx_deadline = cfs_time_shift(*ksocknal_tunables.ksnd_timeout);
         cfs_mb();   /* order with adding to peer's conn list */
 
-        cfs_list_add (&conn->ksnc_list, &peer->ksnp_conns);
+        list_add (&conn->ksnc_list, &peer->ksnp_conns);
         ksocknal_conn_addref(conn);
 
         ksocknal_new_packet(conn, 0);
@@ -1280,11 +1279,11 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
         conn->ksnc_zc_capable = ksocknal_lib_zc_capable(conn);
 
         /* Take packets blocking for this connection. */
-        cfs_list_for_each_entry_safe(tx, txtmp, &peer->ksnp_tx_queue, tx_list) {
+        list_for_each_entry_safe(tx, txtmp, &peer->ksnp_tx_queue, tx_list) {
                 if (conn->ksnc_proto->pro_match_tx(conn, tx, tx->tx_nonblk) == SOCKNAL_MATCH_NO)
                                 continue;
 
-                cfs_list_del (&tx->tx_list);
+                list_del (&tx->tx_list);
                 ksocknal_queue_tx_locked (tx, conn);
         }
 
@@ -1356,10 +1355,10 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
 
  failed_2:
         if (!peer->ksnp_closing &&
-            cfs_list_empty (&peer->ksnp_conns) &&
-            cfs_list_empty (&peer->ksnp_routes)) {
-                cfs_list_add(&zombies, &peer->ksnp_tx_queue);
-                cfs_list_del_init(&peer->ksnp_tx_queue);
+            list_empty (&peer->ksnp_conns) &&
+            list_empty (&peer->ksnp_routes)) {
+                list_add(&zombies, &peer->ksnp_tx_queue);
+                list_del_init(&peer->ksnp_tx_queue);
                 ksocknal_unlink_peer_locked(peer);
         }
 
@@ -1412,14 +1411,14 @@ ksocknal_close_conn_locked (ksock_conn_t *conn, int error)
         ksock_peer_t      *peer = conn->ksnc_peer;
         ksock_route_t     *route;
         ksock_conn_t      *conn2;
-        cfs_list_t        *tmp;
+        struct list_head        *tmp;
 
         LASSERT (peer->ksnp_error == 0);
         LASSERT (!conn->ksnc_closing);
         conn->ksnc_closing = 1;
 
         /* ksnd_deathrow_conns takes over peer's ref */
-        cfs_list_del (&conn->ksnc_list);
+        list_del (&conn->ksnc_list);
 
         route = conn->ksnc_route;
         if (route != NULL) {
@@ -1428,8 +1427,8 @@ ksocknal_close_conn_locked (ksock_conn_t *conn, int error)
                 LASSERT ((route->ksnr_connected & (1 << conn->ksnc_type)) != 0);
 
                 conn2 = NULL;
-                cfs_list_for_each(tmp, &peer->ksnp_conns) {
-                        conn2 = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+                list_for_each(tmp, &peer->ksnp_conns) {
+                        conn2 = list_entry(tmp, ksock_conn_t, ksnc_list);
 
                         if (conn2->ksnc_route == route &&
                             conn2->ksnc_type == conn->ksnc_type)
@@ -1444,28 +1443,28 @@ ksocknal_close_conn_locked (ksock_conn_t *conn, int error)
 
 #if 0           /* irrelevent with only eager routes */
                 /* make route least favourite */
-                cfs_list_del (&route->ksnr_list);
-                cfs_list_add_tail (&route->ksnr_list, &peer->ksnp_routes);
+                list_del (&route->ksnr_list);
+                list_add_tail (&route->ksnr_list, &peer->ksnp_routes);
 #endif
                 ksocknal_route_decref(route);     /* drop conn's ref on route */
         }
 
-        if (cfs_list_empty (&peer->ksnp_conns)) {
+        if (list_empty (&peer->ksnp_conns)) {
                 /* No more connections to this peer */
 
-                if (!cfs_list_empty(&peer->ksnp_tx_queue)) {
+                if (!list_empty(&peer->ksnp_tx_queue)) {
                         ksock_tx_t *tx;
 
                         LASSERT (conn->ksnc_proto == &ksocknal_protocol_v3x);
 
                         /* throw them to the last connection...,
                          * these TXs will be send to /dev/null by scheduler */
-                        cfs_list_for_each_entry(tx, &peer->ksnp_tx_queue,
+                        list_for_each_entry(tx, &peer->ksnp_tx_queue,
                                                 tx_list)
                                 ksocknal_tx_prep(conn, tx);
 
 			spin_lock_bh(&conn->ksnc_scheduler->kss_lock);
-			cfs_list_splice_init(&peer->ksnp_tx_queue,
+			list_splice_init(&peer->ksnp_tx_queue,
 					     &conn->ksnc_tx_queue);
 			spin_unlock_bh(&conn->ksnc_scheduler->kss_lock);
                 }
@@ -1473,7 +1472,7 @@ ksocknal_close_conn_locked (ksock_conn_t *conn, int error)
                 peer->ksnp_proto = NULL;        /* renegotiate protocol version */
                 peer->ksnp_error = error;       /* stash last conn close reason */
 
-                if (cfs_list_empty (&peer->ksnp_routes)) {
+                if (list_empty (&peer->ksnp_routes)) {
                         /* I've just closed last conn belonging to a
                          * peer with no routes to it */
                         ksocknal_unlink_peer_locked (peer);
@@ -1482,7 +1481,7 @@ ksocknal_close_conn_locked (ksock_conn_t *conn, int error)
 
 	spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
 
-	cfs_list_add_tail(&conn->ksnc_list,
+	list_add_tail(&conn->ksnc_list,
 			  &ksocknal_data.ksnd_deathrow_conns);
 	cfs_waitq_signal(&ksocknal_data.ksnd_reaper_waitq);
 
@@ -1502,7 +1501,7 @@ ksocknal_peer_failed (ksock_peer_t *peer)
 	read_lock(&ksocknal_data.ksnd_global_lock);
 
         if ((peer->ksnp_id.pid & LNET_PID_USERFLAG) == 0 &&
-            cfs_list_empty(&peer->ksnp_conns) &&
+            list_empty(&peer->ksnp_conns) &&
             peer->ksnp_accepting == 0 &&
             ksocknal_find_connecting_route_locked(peer) == NULL) {
                 notify = 1;
@@ -1522,7 +1521,7 @@ ksocknal_finalize_zcreq(ksock_conn_t *conn)
         ksock_peer_t     *peer = conn->ksnc_peer;
         ksock_tx_t       *tx;
         ksock_tx_t       *tmp;
-        CFS_LIST_HEAD    (zlist);
+        LIST_HEAD    (zlist);
 
         /* NB safe to finalize TXs because closing of socket will
          * abort all buffered data */
@@ -1530,8 +1529,7 @@ ksocknal_finalize_zcreq(ksock_conn_t *conn)
 
 	spin_lock(&peer->ksnp_lock);
 
-        cfs_list_for_each_entry_safe_typed(tx, tmp, &peer->ksnp_zc_req_list,
-                                           ksock_tx_t, tx_zc_list) {
+        list_for_each_entry_safe(tx, tmp, &peer->ksnp_zc_req_list, tx_zc_list) {
                 if (tx->tx_conn != conn)
                         continue;
 
@@ -1539,16 +1537,16 @@ ksocknal_finalize_zcreq(ksock_conn_t *conn)
 
                 tx->tx_msg.ksm_zc_cookies[0] = 0;
                 tx->tx_zc_aborted = 1; /* mark it as not-acked */
-                cfs_list_del(&tx->tx_zc_list);
-                cfs_list_add(&tx->tx_zc_list, &zlist);
+                list_del(&tx->tx_zc_list);
+                list_add(&tx->tx_zc_list, &zlist);
         }
 
 	spin_unlock(&peer->ksnp_lock);
 
-        while (!cfs_list_empty(&zlist)) {
-                tx = cfs_list_entry(zlist.next, ksock_tx_t, tx_zc_list);
+        while (!list_empty(&zlist)) {
+                tx = list_entry(zlist.next, ksock_tx_t, tx_zc_list);
 
-                cfs_list_del(&tx->tx_zc_list);
+                list_del(&tx->tx_zc_list);
                 ksocknal_tx_decref(tx);
         }
 }
@@ -1573,8 +1571,8 @@ ksocknal_terminate_conn (ksock_conn_t *conn)
         conn->ksnc_tx_ready = 1;
 
         if (!conn->ksnc_tx_scheduled &&
-            !cfs_list_empty(&conn->ksnc_tx_queue)){
-                cfs_list_add_tail (&conn->ksnc_tx_list,
+            !list_empty(&conn->ksnc_tx_queue)){
+                list_add_tail (&conn->ksnc_tx_list,
                                &sched->kss_tx_conns);
                 conn->ksnc_tx_scheduled = 1;
                 /* extra ref for scheduler */
@@ -1596,7 +1594,7 @@ ksocknal_terminate_conn (ksock_conn_t *conn)
 
         if (peer->ksnp_error != 0) {
                 /* peer's last conn closed in error */
-                LASSERT (cfs_list_empty (&peer->ksnp_conns));
+                LASSERT (list_empty (&peer->ksnp_conns));
                 failed = 1;
                 peer->ksnp_error = 0;     /* avoid multiple notifications */
         }
@@ -1622,7 +1620,7 @@ ksocknal_queue_zombie_conn (ksock_conn_t *conn)
 	LASSERT(cfs_atomic_read(&conn->ksnc_conn_refcount) == 0);
 	spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
 
-	cfs_list_add_tail(&conn->ksnc_list, &ksocknal_data.ksnd_zombie_conns);
+	list_add_tail(&conn->ksnc_list, &ksocknal_data.ksnd_zombie_conns);
 	cfs_waitq_signal(&ksocknal_data.ksnd_reaper_waitq);
 
 	spin_unlock_bh(&ksocknal_data.ksnd_reaper_lock);
@@ -1642,7 +1640,7 @@ ksocknal_destroy_conn (ksock_conn_t *conn)
         LASSERT (conn->ksnc_route == NULL);
         LASSERT (!conn->ksnc_tx_scheduled);
         LASSERT (!conn->ksnc_rx_scheduled);
-        LASSERT (cfs_list_empty(&conn->ksnc_tx_queue));
+        LASSERT (list_empty(&conn->ksnc_tx_queue));
 
         /* complete current receive if any */
         switch (conn->ksnc_rx_state) {
@@ -1697,12 +1695,12 @@ int
 ksocknal_close_peer_conns_locked (ksock_peer_t *peer, __u32 ipaddr, int why)
 {
         ksock_conn_t       *conn;
-        cfs_list_t         *ctmp;
-        cfs_list_t         *cnxt;
+        struct list_head         *ctmp;
+        struct list_head         *cnxt;
         int                 count = 0;
 
-        cfs_list_for_each_safe (ctmp, cnxt, &peer->ksnp_conns) {
-                conn = cfs_list_entry (ctmp, ksock_conn_t, ksnc_list);
+        list_for_each_safe (ctmp, cnxt, &peer->ksnp_conns) {
+                conn = list_entry (ctmp, ksock_conn_t, ksnc_list);
 
                 if (ipaddr == 0 ||
                     conn->ksnc_ipaddr == ipaddr) {
@@ -1734,8 +1732,8 @@ int
 ksocknal_close_matching_conns (lnet_process_id_t id, __u32 ipaddr)
 {
         ksock_peer_t       *peer;
-        cfs_list_t         *ptmp;
-        cfs_list_t         *pnxt;
+        struct list_head         *ptmp;
+        struct list_head         *pnxt;
         int                 lo;
         int                 hi;
         int                 i;
@@ -1751,10 +1749,10 @@ ksocknal_close_matching_conns (lnet_process_id_t id, __u32 ipaddr)
         }
 
         for (i = lo; i <= hi; i++) {
-                cfs_list_for_each_safe (ptmp, pnxt,
+                list_for_each_safe (ptmp, pnxt,
                                         &ksocknal_data.ksnd_peers[i]) {
 
-                        peer = cfs_list_entry (ptmp, ksock_peer_t, ksnp_list);
+                        peer = list_entry (ptmp, ksock_peer_t, ksnp_list);
 
                         if (!((id.nid == LNET_NID_ANY || id.nid == peer->ksnp_id.nid) &&
                               (id.pid == LNET_PID_ANY || id.pid == peer->ksnp_id.pid)))
@@ -1810,12 +1808,12 @@ ksocknal_query (lnet_ni_t *ni, lnet_nid_t nid, cfs_time_t *when)
 
         peer = ksocknal_find_peer_locked(ni, id);
         if (peer != NULL) {
-                cfs_list_t       *tmp;
+                struct list_head       *tmp;
                 ksock_conn_t     *conn;
                 int               bufnob;
 
-                cfs_list_for_each (tmp, &peer->ksnp_conns) {
-                        conn = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+                list_for_each (tmp, &peer->ksnp_conns) {
+                        conn = list_entry(tmp, ksock_conn_t, ksnc_list);
                         bufnob = libcfs_sock_wmem_queued(conn->ksnc_sock);
 
                         if (bufnob < conn->ksnc_tx_bufnob) {
@@ -1862,7 +1860,7 @@ ksocknal_push_peer (ksock_peer_t *peer)
 {
         int               index;
         int               i;
-        cfs_list_t       *tmp;
+        struct list_head       *tmp;
         ksock_conn_t     *conn;
 
         for (index = 0; ; index++) {
@@ -1871,9 +1869,9 @@ ksocknal_push_peer (ksock_peer_t *peer)
                 i = 0;
                 conn = NULL;
 
-                cfs_list_for_each (tmp, &peer->ksnp_conns) {
+                list_for_each (tmp, &peer->ksnp_conns) {
                         if (i++ == index) {
-                                conn = cfs_list_entry (tmp, ksock_conn_t,
+                                conn = list_entry (tmp, ksock_conn_t,
                                                        ksnc_list);
                                 ksocknal_conn_addref(conn);
                                 break;
@@ -1894,7 +1892,7 @@ int
 ksocknal_push (lnet_ni_t *ni, lnet_process_id_t id)
 {
         ksock_peer_t      *peer;
-        cfs_list_t        *tmp;
+        struct list_head        *tmp;
         int                index;
         int                i;
         int                j;
@@ -1907,8 +1905,8 @@ ksocknal_push (lnet_ni_t *ni, lnet_process_id_t id)
                         index = 0;
                         peer = NULL;
 
-                        cfs_list_for_each (tmp, &ksocknal_data.ksnd_peers[i]) {
-                                peer = cfs_list_entry(tmp, ksock_peer_t,
+                        list_for_each (tmp, &ksocknal_data.ksnd_peers[i]) {
+                                peer = list_entry(tmp, ksock_peer_t,
                                                       ksnp_list);
 
                                 if (!((id.nid == LNET_NID_ANY ||
@@ -1947,9 +1945,9 @@ ksocknal_add_interface(lnet_ni_t *ni, __u32 ipaddress, __u32 netmask)
         int                rc;
         int                i;
         int                j;
-        cfs_list_t        *ptmp;
+        struct list_head        *ptmp;
         ksock_peer_t      *peer;
-        cfs_list_t        *rtmp;
+        struct list_head        *rtmp;
         ksock_route_t     *route;
 
         if (ipaddress == 0 ||
@@ -1973,16 +1971,16 @@ ksocknal_add_interface(lnet_ni_t *ni, __u32 ipaddress, __u32 netmask)
                 iface->ksni_npeers = 0;
 
                 for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
-                        cfs_list_for_each(ptmp, &ksocknal_data.ksnd_peers[i]) {
-                                peer = cfs_list_entry(ptmp, ksock_peer_t,
+                        list_for_each(ptmp, &ksocknal_data.ksnd_peers[i]) {
+                                peer = list_entry(ptmp, ksock_peer_t,
                                                       ksnp_list);
 
                                 for (j = 0; j < peer->ksnp_n_passive_ips; j++)
                                         if (peer->ksnp_passive_ips[j] == ipaddress)
                                                 iface->ksni_npeers++;
 
-                                cfs_list_for_each(rtmp, &peer->ksnp_routes) {
-                                        route = cfs_list_entry(rtmp,
+                                list_for_each(rtmp, &peer->ksnp_routes) {
+                                        route = list_entry(rtmp,
                                                                ksock_route_t,
                                                                ksnr_list);
 
@@ -2004,8 +2002,8 @@ ksocknal_add_interface(lnet_ni_t *ni, __u32 ipaddress, __u32 netmask)
 void
 ksocknal_peer_del_interface_locked(ksock_peer_t *peer, __u32 ipaddr)
 {
-        cfs_list_t         *tmp;
-        cfs_list_t         *nxt;
+        struct list_head         *tmp;
+        struct list_head         *nxt;
         ksock_route_t      *route;
         ksock_conn_t       *conn;
         int                 i;
@@ -2020,8 +2018,8 @@ ksocknal_peer_del_interface_locked(ksock_peer_t *peer, __u32 ipaddr)
                         break;
                 }
 
-        cfs_list_for_each_safe(tmp, nxt, &peer->ksnp_routes) {
-                route = cfs_list_entry (tmp, ksock_route_t, ksnr_list);
+        list_for_each_safe(tmp, nxt, &peer->ksnp_routes) {
+                route = list_entry (tmp, ksock_route_t, ksnr_list);
 
                 if (route->ksnr_myipaddr != ipaddr)
                         continue;
@@ -2034,8 +2032,8 @@ ksocknal_peer_del_interface_locked(ksock_peer_t *peer, __u32 ipaddr)
                 }
         }
 
-        cfs_list_for_each_safe(tmp, nxt, &peer->ksnp_conns) {
-                conn = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+        list_for_each_safe(tmp, nxt, &peer->ksnp_conns) {
+                conn = list_entry(tmp, ksock_conn_t, ksnc_list);
 
                 if (conn->ksnc_myipaddr == ipaddr)
                         ksocknal_close_conn_locked (conn, 0);
@@ -2047,8 +2045,8 @@ ksocknal_del_interface(lnet_ni_t *ni, __u32 ipaddress)
 {
         ksock_net_t       *net = ni->ni_data;
         int                rc = -ENOENT;
-        cfs_list_t        *tmp;
-        cfs_list_t        *nxt;
+        struct list_head        *tmp;
+        struct list_head        *nxt;
         ksock_peer_t      *peer;
         __u32              this_ip;
         int                i;
@@ -2072,9 +2070,9 @@ ksocknal_del_interface(lnet_ni_t *ni, __u32 ipaddress)
                 net->ksnn_ninterfaces--;
 
                 for (j = 0; j < ksocknal_data.ksnd_peer_hash_size; j++) {
-                        cfs_list_for_each_safe(tmp, nxt,
+                        list_for_each_safe(tmp, nxt,
                                                &ksocknal_data.ksnd_peers[j]) {
-                                peer = cfs_list_entry(tmp, ksock_peer_t,
+                                peer = list_entry(tmp, ksock_peer_t,
                                                       ksnp_list);
 
                                 if (peer->ksnp_ni != ni)
@@ -2237,22 +2235,22 @@ ksocknal_free_buffers (void)
 	}
 
         LIBCFS_FREE (ksocknal_data.ksnd_peers,
-                     sizeof (cfs_list_t) *
+                     sizeof (struct list_head) *
                      ksocknal_data.ksnd_peer_hash_size);
 
 	spin_lock(&ksocknal_data.ksnd_tx_lock);
 
-	if (!cfs_list_empty(&ksocknal_data.ksnd_idle_noop_txs)) {
-		cfs_list_t	zlist;
+	if (!list_empty(&ksocknal_data.ksnd_idle_noop_txs)) {
+		struct list_head	zlist;
 		ksock_tx_t	*tx;
 
-		cfs_list_add(&zlist, &ksocknal_data.ksnd_idle_noop_txs);
-		cfs_list_del_init(&ksocknal_data.ksnd_idle_noop_txs);
+		list_add(&zlist, &ksocknal_data.ksnd_idle_noop_txs);
+		list_del_init(&ksocknal_data.ksnd_idle_noop_txs);
 		spin_unlock(&ksocknal_data.ksnd_tx_lock);
 
-		while (!cfs_list_empty(&zlist)) {
-			tx = cfs_list_entry(zlist.next, ksock_tx_t, tx_list);
-			cfs_list_del(&tx->tx_list);
+		while (!list_empty(&zlist)) {
+			tx = list_entry(zlist.next, ksock_tx_t, tx_list);
+			list_del(&tx->tx_list);
 			LIBCFS_FREE(tx, tx->tx_desc_size);
 		}
 	} else {
@@ -2280,14 +2278,14 @@ ksocknal_base_shutdown(void)
         case SOCKNAL_INIT_DATA:
                 LASSERT (ksocknal_data.ksnd_peers != NULL);
                 for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
-                        LASSERT (cfs_list_empty (&ksocknal_data.ksnd_peers[i]));
+                        LASSERT (list_empty (&ksocknal_data.ksnd_peers[i]));
                 }
 
-		LASSERT(cfs_list_empty(&ksocknal_data.ksnd_nets));
-                LASSERT (cfs_list_empty (&ksocknal_data.ksnd_enomem_conns));
-                LASSERT (cfs_list_empty (&ksocknal_data.ksnd_zombie_conns));
-                LASSERT (cfs_list_empty (&ksocknal_data.ksnd_connd_connreqs));
-                LASSERT (cfs_list_empty (&ksocknal_data.ksnd_connd_routes));
+		LASSERT(list_empty(&ksocknal_data.ksnd_nets));
+                LASSERT (list_empty (&ksocknal_data.ksnd_enomem_conns));
+                LASSERT (list_empty (&ksocknal_data.ksnd_zombie_conns));
+                LASSERT (list_empty (&ksocknal_data.ksnd_connd_connreqs));
+                LASSERT (list_empty (&ksocknal_data.ksnd_connd_routes));
 
 		if (ksocknal_data.ksnd_sched_info != NULL) {
 			cfs_percpt_for_each(info, i,
@@ -2298,11 +2296,11 @@ ksocknal_base_shutdown(void)
 				for (j = 0; j < info->ksi_nthreads_max; j++) {
 
 					sched = &info->ksi_scheds[j];
-					LASSERT(cfs_list_empty(&sched->\
+					LASSERT(list_empty(&sched->\
 							       kss_tx_conns));
-					LASSERT(cfs_list_empty(&sched->\
+					LASSERT(list_empty(&sched->\
 							       kss_rx_conns));
-					LASSERT(cfs_list_empty(&sched-> \
+					LASSERT(list_empty(&sched-> \
 						  kss_zombie_noop_txs));
 					LASSERT(sched->kss_nconns == 0);
 				}
@@ -2381,30 +2379,30 @@ ksocknal_base_startup(void)
 
         ksocknal_data.ksnd_peer_hash_size = SOCKNAL_PEER_HASH_SIZE;
         LIBCFS_ALLOC (ksocknal_data.ksnd_peers,
-                      sizeof (cfs_list_t) *
+                      sizeof (struct list_head) *
                       ksocknal_data.ksnd_peer_hash_size);
         if (ksocknal_data.ksnd_peers == NULL)
                 return -ENOMEM;
 
         for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++)
-                CFS_INIT_LIST_HEAD(&ksocknal_data.ksnd_peers[i]);
+                INIT_LIST_HEAD(&ksocknal_data.ksnd_peers[i]);
 
 	rwlock_init(&ksocknal_data.ksnd_global_lock);
-	CFS_INIT_LIST_HEAD(&ksocknal_data.ksnd_nets);
+	INIT_LIST_HEAD(&ksocknal_data.ksnd_nets);
 
 	spin_lock_init(&ksocknal_data.ksnd_reaper_lock);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_enomem_conns);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_zombie_conns);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_deathrow_conns);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_enomem_conns);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_zombie_conns);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_deathrow_conns);
         cfs_waitq_init(&ksocknal_data.ksnd_reaper_waitq);
 
 	spin_lock_init(&ksocknal_data.ksnd_connd_lock);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_connd_connreqs);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_connd_routes);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_connd_connreqs);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_connd_routes);
         cfs_waitq_init(&ksocknal_data.ksnd_connd_waitq);
 
 	spin_lock_init(&ksocknal_data.ksnd_tx_lock);
-        CFS_INIT_LIST_HEAD (&ksocknal_data.ksnd_idle_noop_txs);
+        INIT_LIST_HEAD (&ksocknal_data.ksnd_idle_noop_txs);
 
 	/* NB memset above zeros whole of ksocknal_data */
 
@@ -2443,9 +2441,9 @@ ksocknal_base_startup(void)
 
 			sched->kss_info = info;
 			spin_lock_init(&sched->kss_lock);
-			CFS_INIT_LIST_HEAD(&sched->kss_rx_conns);
-			CFS_INIT_LIST_HEAD(&sched->kss_tx_conns);
-			CFS_INIT_LIST_HEAD(&sched->kss_zombie_noop_txs);
+			INIT_LIST_HEAD(&sched->kss_rx_conns);
+			INIT_LIST_HEAD(&sched->kss_tx_conns);
+			INIT_LIST_HEAD(&sched->kss_zombie_noop_txs);
 			cfs_waitq_init(&sched->kss_waitq);
 		}
         }
@@ -2503,14 +2501,14 @@ void
 ksocknal_debug_peerhash (lnet_ni_t *ni)
 {
 	ksock_peer_t	*peer = NULL;
-	cfs_list_t	*tmp;
+	struct list_head	*tmp;
 	int		i;
 
 	read_lock(&ksocknal_data.ksnd_global_lock);
 
         for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
-                cfs_list_for_each (tmp, &ksocknal_data.ksnd_peers[i]) {
-                        peer = cfs_list_entry (tmp, ksock_peer_t, ksnp_list);
+                list_for_each (tmp, &ksocknal_data.ksnd_peers[i]) {
+                        peer = list_entry (tmp, ksock_peer_t, ksnp_list);
 
                         if (peer->ksnp_ni == ni) break;
 
@@ -2529,19 +2527,19 @@ ksocknal_debug_peerhash (lnet_ni_t *ni)
                        peer->ksnp_sharecount, peer->ksnp_closing,
                        peer->ksnp_accepting, peer->ksnp_error,
                        peer->ksnp_zc_next_cookie,
-                       !cfs_list_empty(&peer->ksnp_tx_queue),
-                       !cfs_list_empty(&peer->ksnp_zc_req_list));
+                       !list_empty(&peer->ksnp_tx_queue),
+                       !list_empty(&peer->ksnp_zc_req_list));
 
-                cfs_list_for_each (tmp, &peer->ksnp_routes) {
-                        route = cfs_list_entry(tmp, ksock_route_t, ksnr_list);
+                list_for_each (tmp, &peer->ksnp_routes) {
+                        route = list_entry(tmp, ksock_route_t, ksnr_list);
                         CWARN ("Route: ref %d, schd %d, conn %d, cnted %d, "
                                "del %d\n", cfs_atomic_read(&route->ksnr_refcount),
                                route->ksnr_scheduled, route->ksnr_connecting,
                                route->ksnr_connected, route->ksnr_deleted);
                 }
 
-                cfs_list_for_each (tmp, &peer->ksnp_conns) {
-                        conn = cfs_list_entry(tmp, ksock_conn_t, ksnc_list);
+                list_for_each (tmp, &peer->ksnp_conns) {
+                        conn = list_entry(tmp, ksock_conn_t, ksnc_list);
                         CWARN ("Conn: ref %d, sref %d, t %d, c %d\n",
                                cfs_atomic_read(&conn->ksnc_conn_refcount),
                                cfs_atomic_read(&conn->ksnc_sock_refcount),
@@ -2596,7 +2594,7 @@ ksocknal_shutdown (lnet_ni_t *ni)
                 LASSERT (net->ksnn_interfaces[i].ksni_nroutes == 0);
         }
 
-	cfs_list_del(&net->ksnn_list);
+	list_del(&net->ksnn_list);
 	LIBCFS_FREE(net, sizeof(*net));
 
         ksocknal_data.ksnd_nnets--;
@@ -2677,7 +2675,7 @@ ksocknal_search_new_ipif(ksock_net_t *net)
 		if (colon != NULL) /* ignore alias device */
 			*colon = 0;
 
-		cfs_list_for_each_entry(tmp, &ksocknal_data.ksnd_nets,
+		list_for_each_entry(tmp, &ksocknal_data.ksnd_nets,
 					ksnn_list) {
 			for (j = 0; !found && j < tmp->ksnn_ninterfaces; j++) {
 				char *ifnam2 = &tmp->ksnn_interfaces[j].\
@@ -2845,7 +2843,7 @@ ksocknal_startup (lnet_ni_t *ni)
 
 	ni->ni_nid = LNET_MKNID(LNET_NIDNET(ni->ni_nid),
 				net->ksnn_interfaces[0].ksni_ipaddr);
-	cfs_list_add(&net->ksnn_list, &ksocknal_data.ksnd_nets);
+	list_add(&net->ksnn_list, &ksocknal_data.ksnd_nets);
 
         ksocknal_data.ksnd_nnets++;
 

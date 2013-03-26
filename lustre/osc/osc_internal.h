@@ -56,8 +56,8 @@ struct osc_async_page {
         unsigned short          oap_cmd;
         unsigned short          oap_interrupted:1;
 
-        cfs_list_t              oap_pending_item;
-        cfs_list_t              oap_rpc_item;
+        struct list_head              oap_pending_item;
+        struct list_head              oap_rpc_item;
 
         obd_off                 oap_obj_off;
         unsigned                oap_page_off;
@@ -78,7 +78,7 @@ struct osc_async_page {
 #define oap_brw_flags   oap_brw_page.flag
 
 struct osc_cache_waiter {
-        cfs_list_t              ocw_entry;
+        struct list_head              ocw_entry;
         cfs_waitq_t             ocw_waitq;
         struct osc_async_page  *ocw_oap;
 	int                     ocw_grant;
@@ -128,7 +128,7 @@ int osc_sync_base(struct obd_export *exp, struct obd_info *oinfo,
 
 int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *cfg);
 int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
-		  cfs_list_t *ext_list, int cmd, pdl_policy_t p);
+		  struct list_head *ext_list, int cmd, pdl_policy_t p);
 int osc_lru_shrink(struct client_obd *cli, int target);
 
 extern spinlock_t osc_ast_guard;
@@ -191,7 +191,7 @@ int osc_dlm_lock_pageref(struct ldlm_lock *dlm);
 extern cfs_mem_cache_t *osc_quota_kmem;
 struct osc_quota_info {
         /** linkage for quota hash table */
-        cfs_hlist_node_t oqi_hash;
+        struct hlist_node oqi_hash;
 	obd_uid          oqi_id;
 };
 int osc_quota_setup(struct obd_device *obd);

@@ -620,7 +620,7 @@ static int ofd_init0(const struct lu_env *env, struct ofd_device *m,
 	sptlrpc_rule_set_init(&obd->u.filter.fo_sptlrpc_rset);
 
 	obd->u.filter.fo_fl_oss_capa = 0;
-	CFS_INIT_LIST_HEAD(&obd->u.filter.fo_capa_keys);
+	INIT_LIST_HEAD(&obd->u.filter.fo_capa_keys);
 	obd->u.filter.fo_capa_hash = init_capa_hash();
 	if (obd->u.filter.fo_capa_hash == NULL)
 		RETURN(-ENOMEM);

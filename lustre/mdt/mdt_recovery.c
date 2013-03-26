@@ -586,7 +586,7 @@ int mdt_fs_setup(const struct lu_env *env, struct mdt_device *mdt,
         mdt->mdt_txn_cb.dtc_txn_commit = NULL;
         mdt->mdt_txn_cb.dtc_cookie = mdt;
         mdt->mdt_txn_cb.dtc_tag = LCT_MD_THREAD;
-        CFS_INIT_LIST_HEAD(&mdt->mdt_txn_cb.dtc_linkage);
+        INIT_LIST_HEAD(&mdt->mdt_txn_cb.dtc_linkage);
 
         dt_txn_callback_add(mdt->mdt_bottom, &mdt->mdt_txn_cb);
 
@@ -612,14 +612,14 @@ static void mdt_steal_ack_locks(struct ptlrpc_request *req)
 {
 	struct ptlrpc_service_part *svcpt;
         struct obd_export         *exp = req->rq_export;
-        cfs_list_t                *tmp;
+        struct list_head                *tmp;
         struct ptlrpc_reply_state *oldrep;
         int                        i;
 
         /* CAVEAT EMPTOR: spinlock order */
 	spin_lock(&exp->exp_lock);
-        cfs_list_for_each (tmp, &exp->exp_outstanding_replies) {
-                oldrep = cfs_list_entry(tmp, struct ptlrpc_reply_state,
+        list_for_each (tmp, &exp->exp_outstanding_replies) {
+                oldrep = list_entry(tmp, struct ptlrpc_reply_state,
                                         rs_exp_list);
 
                 if (oldrep->rs_xid != req->rq_xid)
@@ -634,7 +634,7 @@ static void mdt_steal_ack_locks(struct ptlrpc_request *req)
 		svcpt = oldrep->rs_svcpt;
 		spin_lock(&svcpt->scp_rep_lock);
 
-                cfs_list_del_init (&oldrep->rs_exp_list);
+                list_del_init (&oldrep->rs_exp_list);
 
 		CDEBUG(D_HA, "Stealing %d locks from rs %p x"LPD64".t"LPD64
 		       " o%d NID %s\n",
@@ -792,7 +792,7 @@ static void mdt_reconstruct_setattr(struct mdt_thread_info *mti,
                 repbody = req_capsule_server_get(mti->mti_pill, &RMF_MDT_BODY);
                 repbody->ioepoch = obj->mot_ioepoch;
 		spin_lock(&med->med_open_lock);
-		cfs_list_for_each_entry(mfd, &med->med_open_head, mfd_list) {
+		list_for_each_entry(mfd, &med->med_open_head, mfd_list) {
 			if (mfd->mfd_xid == req->rq_xid)
 				break;
 		}

@@ -163,7 +163,7 @@ static inline void mdc_update_max_ea_from_body(struct obd_export *exp,
 
 
 struct mdc_cache_waiter {
-        cfs_list_t              mcw_entry;
+        struct list_head              mcw_entry;
         cfs_waitq_t             mcw_waitq;
 };
 

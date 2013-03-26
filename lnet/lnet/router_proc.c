@@ -194,12 +194,12 @@ int LL_PROC_PROTO(proc_lnet_routes)
 		lnet_net_unlock(0);
 		*ppos = LNET_PROC_POS_MAKE(0, ver, 0, off);
 	} else {
-		cfs_list_t		*n;
-		cfs_list_t		*r;
+		struct list_head		*n;
+		struct list_head		*r;
 		lnet_route_t		*route = NULL;
 		lnet_remotenet_t	*rnet  = NULL;
 		int			skip  = off - 1;
-		cfs_list_t		*rn_list;
+		struct list_head		*rn_list;
 		int			i;
 
 		lnet_net_lock(0);
@@ -217,14 +217,14 @@ int LL_PROC_PROTO(proc_lnet_routes)
 			n = rn_list->next;
 
 			while (n != rn_list && route == NULL) {
-				rnet = cfs_list_entry(n, lnet_remotenet_t,
+				rnet = list_entry(n, lnet_remotenet_t,
 						      lrn_list);
 
 				r = rnet->lrn_routes.next;
 
 				while (r != &rnet->lrn_routes) {
 					lnet_route_t *re =
-						cfs_list_entry(r, lnet_route_t,
+						list_entry(r, lnet_route_t,
 							       lr_list);
 					if (skip == 0) {
 						route = re;
@@ -316,7 +316,7 @@ int LL_PROC_PROTO(proc_lnet_routers)
 		lnet_net_unlock(0);
 		*ppos = LNET_PROC_POS_MAKE(0, ver, 0, off);
 	} else {
-		cfs_list_t		*r;
+		struct list_head		*r;
 		struct lnet_peer	*peer = NULL;
 		int			skip = off - 1;
 
@@ -332,7 +332,7 @@ int LL_PROC_PROTO(proc_lnet_routers)
                 r = the_lnet.ln_routers.next;
 
                 while (r != &the_lnet.ln_routers) {
-                        lnet_peer_t *lp = cfs_list_entry(r, lnet_peer_t,
+                        lnet_peer_t *lp = list_entry(r, lnet_peer_t,
                                                          lp_rtr_list);
 
                         if (skip == 0) {
@@ -360,7 +360,7 @@ int LL_PROC_PROTO(proc_lnet_routers)
 
 			if ((peer->lp_ping_feats &
 			     LNET_PING_FEAT_NI_STATUS) != 0) {
-				cfs_list_for_each_entry(rtr, &peer->lp_routes,
+				list_for_each_entry(rtr, &peer->lp_routes,
 							lr_gwlist) {
 					/* downis on any route should be the
 					 * number of downis on the gateway */
@@ -453,7 +453,7 @@ int LL_PROC_PROTO(proc_lnet_peers)
 		hoff++;
 	} else {
 		struct lnet_peer	*peer;
-		cfs_list_t		*p;
+		struct list_head		*p;
 		int			skip;
  again:
 		p = NULL;
@@ -476,7 +476,7 @@ int LL_PROC_PROTO(proc_lnet_peers)
 				p = ptable->pt_hash[hash].next;
 
 			while (p != &ptable->pt_hash[hash]) {
-                                lnet_peer_t *lp = cfs_list_entry(p, lnet_peer_t,
+                                lnet_peer_t *lp = list_entry(p, lnet_peer_t,
                                                                  lp_hashlist);
                                 if (skip == 0) {
                                         peer = lp;
@@ -667,7 +667,7 @@ int LL_PROC_PROTO(proc_lnet_nis)
                               "rtr", "max", "tx", "min");
                 LASSERT (tmpstr + tmpsiz - s > 0);
         } else {
-                cfs_list_t        *n;
+                struct list_head        *n;
                 lnet_ni_t         *ni   = NULL;
                 int                skip = *ppos - 1;
 
@@ -676,7 +676,7 @@ int LL_PROC_PROTO(proc_lnet_nis)
                 n = the_lnet.ln_nis.next;
 
                 while (n != &the_lnet.ln_nis) {
-                        lnet_ni_t *a_ni = cfs_list_entry(n, lnet_ni_t, ni_list);
+                        lnet_ni_t *a_ni = list_entry(n, lnet_ni_t, ni_list);
 
                         if (skip == 0) {
                                 ni = a_ni;

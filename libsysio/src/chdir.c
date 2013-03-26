@@ -71,7 +71,6 @@
 #include <limits.h>
 #include <errno.h>
 #include <assert.h>
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "inode.h"

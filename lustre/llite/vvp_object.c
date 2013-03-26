@@ -65,7 +65,7 @@ static int vvp_object_print(const struct lu_env *env, void *cookie,
         struct ll_inode_info *lli;
 
         (*p)(env, cookie, "(%s %d %d) inode: %p ",
-             cfs_list_empty(&obj->cob_pending_list) ? "-" : "+",
+             list_empty(&obj->cob_pending_list) ? "-" : "+",
              obj->cob_transient_pages, cfs_atomic_read(&obj->cob_mmap_cnt),
              inode);
         if (inode) {

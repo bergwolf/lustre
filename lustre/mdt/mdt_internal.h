@@ -86,7 +86,7 @@ struct mdt_object;
 struct mdt_file_data {
         struct portals_handle mfd_handle; /* must be first */
 	int		      mfd_mode;   /* open mode provided by client */
-        cfs_list_t            mfd_list;   /* protected by med_open_lock */
+        struct list_head            mfd_list;   /* protected by med_open_lock */
         __u64                 mfd_xid;    /* xid of the open request */
         struct lustre_handle  mfd_old_handle; /* old handle in replay case */
         struct mdt_object    *mfd_object; /* point to opened object */
@@ -173,7 +173,7 @@ struct mdt_device {
         /* root squash */
         uid_t                      mdt_squash_uid;
         gid_t                      mdt_squash_gid;
-        cfs_list_t                 mdt_nosquash_nids;
+        struct list_head                 mdt_nosquash_nids;
         char                      *mdt_nosquash_str;
         int                        mdt_nosquash_strlen;
 	struct rw_semaphore	   mdt_squash_sem;

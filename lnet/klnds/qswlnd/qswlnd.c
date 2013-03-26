@@ -57,7 +57,7 @@ int
 kqswnal_get_tx_desc (struct libcfs_ioctl_data *data)
 {
 	unsigned long      flags;
-	cfs_list_t        *tmp;
+	struct list_head        *tmp;
 	kqswnal_tx_t      *ktx;
 	lnet_hdr_t        *hdr;
 	int                index = data->ioc_count;
@@ -65,11 +65,11 @@ kqswnal_get_tx_desc (struct libcfs_ioctl_data *data)
 
 	spin_lock_irqsave(&kqswnal_data.kqn_idletxd_lock, flags);
 
-	cfs_list_for_each (tmp, &kqswnal_data.kqn_activetxds) {
+	list_for_each (tmp, &kqswnal_data.kqn_activetxds) {
 		if (index-- != 0)
 			continue;
 
-		ktx = cfs_list_entry (tmp, kqswnal_tx_t, ktx_list);
+		ktx = list_entry (tmp, kqswnal_tx_t, ktx_list);
 		hdr = (lnet_hdr_t *)ktx->ktx_buffer;
 
 		data->ioc_count  = le32_to_cpu(hdr->payload_length);
@@ -78,7 +78,7 @@ kqswnal_get_tx_desc (struct libcfs_ioctl_data *data)
 		data->ioc_u32[0] = le32_to_cpu(hdr->type);
 		data->ioc_u32[1] = ktx->ktx_launcher;
 		data->ioc_flags  =
-                        (cfs_list_empty (&ktx->ktx_schedlist) ? 0 : 1) |
+                        (list_empty (&ktx->ktx_schedlist) ? 0 : 1) |
 				         (ktx->ktx_state << 2);
 		rc = 0;
 		break;
@@ -169,7 +169,7 @@ kqswnal_shutdown(lnet_ni_t *ni)
 
 	/* NB ep_free_xmtr() returns only after all outstanding transmits
 	 * have called their callback... */
-	LASSERT(cfs_list_empty(&kqswnal_data.kqn_activetxds));
+	LASSERT(list_empty(&kqswnal_data.kqn_activetxds));
 
 	/**********************************************************************/
 	/* flag threads to terminate, wake them and wait for them to die */
@@ -187,9 +187,9 @@ kqswnal_shutdown(lnet_ni_t *ni)
 	 * I control the horizontals and the verticals...
 	 */
 
-	LASSERT (cfs_list_empty (&kqswnal_data.kqn_readyrxds));
-	LASSERT (cfs_list_empty (&kqswnal_data.kqn_donetxds));
-	LASSERT (cfs_list_empty (&kqswnal_data.kqn_delayedtxds));
+	LASSERT (list_empty (&kqswnal_data.kqn_readyrxds));
+	LASSERT (list_empty (&kqswnal_data.kqn_donetxds));
+	LASSERT (list_empty (&kqswnal_data.kqn_delayedtxds));
 
 	/**********************************************************************/
 	/* Unmap message buffers and free all descriptors and buffers
@@ -298,13 +298,13 @@ kqswnal_startup (lnet_ni_t *ni)
 	ni->ni_peertxcredits = *kqswnal_tunables.kqn_peercredits;
 	ni->ni_maxtxcredits = *kqswnal_tunables.kqn_credits;
 
-	CFS_INIT_LIST_HEAD (&kqswnal_data.kqn_idletxds);
-	CFS_INIT_LIST_HEAD (&kqswnal_data.kqn_activetxds);
+	INIT_LIST_HEAD (&kqswnal_data.kqn_idletxds);
+	INIT_LIST_HEAD (&kqswnal_data.kqn_activetxds);
 	spin_lock_init(&kqswnal_data.kqn_idletxd_lock);
 
-	CFS_INIT_LIST_HEAD (&kqswnal_data.kqn_delayedtxds);
-	CFS_INIT_LIST_HEAD (&kqswnal_data.kqn_donetxds);
-	CFS_INIT_LIST_HEAD (&kqswnal_data.kqn_readyrxds);
+	INIT_LIST_HEAD (&kqswnal_data.kqn_delayedtxds);
+	INIT_LIST_HEAD (&kqswnal_data.kqn_donetxds);
+	INIT_LIST_HEAD (&kqswnal_data.kqn_readyrxds);
 
 	spin_lock_init(&kqswnal_data.kqn_sched_lock);
 	cfs_waitq_init (&kqswnal_data.kqn_sched_waitq);
@@ -433,12 +433,12 @@ kqswnal_startup (lnet_ni_t *ni)
 		ktx->ktx_basepage = basepage + premapped_pages; /* message mapping starts here */
 		ktx->ktx_npages = KQSW_NTXMSGPAGES - premapped_pages; /* for this many pages */
 
-		CFS_INIT_LIST_HEAD (&ktx->ktx_schedlist);
+		INIT_LIST_HEAD (&ktx->ktx_schedlist);
 
 		ktx->ktx_state = KTX_IDLE;
 		ktx->ktx_rail = -1;		/* unset rail */
 
-		cfs_list_add_tail (&ktx->ktx_list, &kqswnal_data.kqn_idletxds);
+		list_add_tail (&ktx->ktx_list, &kqswnal_data.kqn_idletxds);
 	}
 
 	/**********************************************************************/

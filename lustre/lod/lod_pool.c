@@ -61,8 +61,8 @@ void lod_pool_putref(struct pool_desc *pool)
 {
 	CDEBUG(D_INFO, "pool %p\n", pool);
 	if (atomic_dec_and_test(&pool->pool_refcount)) {
-		LASSERT(cfs_hlist_unhashed(&pool->pool_hash));
-		LASSERT(cfs_list_empty(&pool->pool_list));
+		LASSERT(hlist_unhashed(&pool->pool_hash));
+		LASSERT(list_empty(&pool->pool_list));
 		LASSERT(pool->pool_proc_entry == NULL);
 		lod_ost_pool_free(&(pool->pool_rr.lqr_pool));
 		lod_ost_pool_free(&(pool->pool_obds));
@@ -103,43 +103,43 @@ static __u32 pool_hashfn(cfs_hash_t *hash_body, const void *key, unsigned mask)
 	return (result % mask);
 }
 
-static void *pool_key(cfs_hlist_node_t *hnode)
+static void *pool_key(struct hlist_node *hnode)
 {
 	struct pool_desc *pool;
 
-	pool = cfs_hlist_entry(hnode, struct pool_desc, pool_hash);
+	pool = hlist_entry(hnode, struct pool_desc, pool_hash);
 	return (pool->pool_name);
 }
 
-static int pool_hashkey_keycmp(const void *key, cfs_hlist_node_t *compared_hnode)
+static int pool_hashkey_keycmp(const void *key, struct hlist_node *compared_hnode)
 {
 	char *pool_name;
 	struct pool_desc *pool;
 
 	pool_name = (char *)key;
-	pool = cfs_hlist_entry(compared_hnode, struct pool_desc, pool_hash);
+	pool = hlist_entry(compared_hnode, struct pool_desc, pool_hash);
 	return !strncmp(pool_name, pool->pool_name, LOV_MAXPOOLNAME);
 }
 
-static void *pool_hashobject(cfs_hlist_node_t *hnode)
+static void *pool_hashobject(struct hlist_node *hnode)
 {
-	return cfs_hlist_entry(hnode, struct pool_desc, pool_hash);
+	return hlist_entry(hnode, struct pool_desc, pool_hash);
 }
 
-static void pool_hashrefcount_get(cfs_hash_t *hs, cfs_hlist_node_t *hnode)
+static void pool_hashrefcount_get(cfs_hash_t *hs, struct hlist_node *hnode)
 {
 	struct pool_desc *pool;
 
-	pool = cfs_hlist_entry(hnode, struct pool_desc, pool_hash);
+	pool = hlist_entry(hnode, struct pool_desc, pool_hash);
 	lod_pool_getref(pool);
 }
 
 static void pool_hashrefcount_put_locked(cfs_hash_t *hs,
-		cfs_hlist_node_t *hnode)
+		struct hlist_node *hnode)
 {
 	struct pool_desc *pool;
 
-	pool = cfs_hlist_entry(hnode, struct pool_desc, pool_hash);
+	pool = hlist_entry(hnode, struct pool_desc, pool_hash);
 	lod_pool_putref_locked(pool);
 }
 
@@ -474,7 +474,7 @@ int lod_pool_new(struct obd_device *obd, char *poolname)
 #endif
 
 	spin_lock(&obd->obd_dev_lock);
-	cfs_list_add_tail(&new_pool->pool_list, &lod->lod_pool_list);
+	list_add_tail(&new_pool->pool_list, &lod->lod_pool_list);
 	lod->lod_pool_count++;
 	spin_unlock(&obd->obd_dev_lock);
 
@@ -491,7 +491,7 @@ int lod_pool_new(struct obd_device *obd, char *poolname)
 
 out_err:
 	spin_lock(&obd->obd_dev_lock);
-	cfs_list_del_init(&new_pool->pool_list);
+	list_del_init(&new_pool->pool_list);
 	lod->lod_pool_count--;
 	spin_unlock(&obd->obd_dev_lock);
 
@@ -522,7 +522,7 @@ int lod_pool_del(struct obd_device *obd, char *poolname)
 	}
 
 	spin_lock(&obd->obd_dev_lock);
-	cfs_list_del_init(&pool->pool_list);
+	list_del_init(&pool->pool_list);
 	lod->lod_pool_count--;
 	spin_unlock(&obd->obd_dev_lock);
 

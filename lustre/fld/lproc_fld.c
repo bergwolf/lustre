@@ -73,7 +73,7 @@ fld_proc_read_targets(char *page, char **start, off_t off,
 	LASSERT(fld != NULL);
 
 	spin_lock(&fld->lcf_lock);
-        cfs_list_for_each_entry(target,
+        list_for_each_entry(target,
                                 &fld->lcf_targets, ft_chain)
         {
                 rc = snprintf(page, count, "%s\n",

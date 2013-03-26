@@ -71,8 +71,8 @@ struct lu_fld_hash {
 };
 
 struct fld_cache_entry {
-        cfs_list_t               fce_lru;
-        cfs_list_t               fce_list;
+        struct list_head               fce_lru;
+        struct list_head               fce_list;
         /**
          * fld cache entries are sorted on range->lsr_start field. */
         struct lu_seq_range      fce_range;
@@ -99,11 +99,11 @@ struct fld_cache {
 
         /**
          * LRU list fld entries. */
-        cfs_list_t               fci_lru;
+        struct list_head               fci_lru;
 
         /**
          * sorted fld entries. */
-        cfs_list_t               fci_entries_head;
+        struct list_head               fci_entries_head;
 
         /**
          * Cache statistics. */

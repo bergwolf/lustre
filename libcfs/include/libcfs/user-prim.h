@@ -83,12 +83,12 @@ typedef struct proc_dir_entry           cfs_proc_dir_entry_t;
  */
 
 typedef struct cfs_waitlink {
-        cfs_list_t sleeping;
+        struct list_head sleeping;
         void *process;
 } cfs_waitlink_t;
 
 typedef struct cfs_waitq {
-        cfs_list_t sleepers;
+        struct list_head sleepers;
 } cfs_waitq_t;
 
 #define CFS_DECL_WAITQ(wq) cfs_waitq_t wq
@@ -125,7 +125,7 @@ typedef sigset_t                        cfs_sigset_t;
  */
 
 typedef struct {
-        cfs_list_t tl_list;
+        struct list_head tl_list;
         void (*function)(ulong_ptr_t unused);
         ulong_ptr_t data;
         long expires;

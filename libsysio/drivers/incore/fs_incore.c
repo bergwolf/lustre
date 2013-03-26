@@ -59,7 +59,6 @@
 #ifdef _HAVE_STATVFS
 #include <sys/statvfs.h>
 #endif
-#include <sys/queue.h>
 
 #include "sysio.h"
 #include "xtio.h"

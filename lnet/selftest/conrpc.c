@@ -107,7 +107,7 @@ lstcon_rpc_init(lstcon_node_t *nd, int service, unsigned feats,
         crpc->crp_status   = 0;
         crpc->crp_stamp    = 0;
 	crpc->crp_embedded = embedded;
-        CFS_INIT_LIST_HEAD(&crpc->crp_link);
+        INIT_LIST_HEAD(&crpc->crp_link);
 
         cfs_atomic_inc(&console_session.ses_rpc_counter);
 
@@ -123,10 +123,10 @@ lstcon_rpc_prep(lstcon_node_t *nd, int service, unsigned feats,
 
 	spin_lock(&console_session.ses_rpc_lock);
 
-	if (!cfs_list_empty(&console_session.ses_rpc_freelist)) {
-		crpc = cfs_list_entry(console_session.ses_rpc_freelist.next,
+	if (!list_empty(&console_session.ses_rpc_freelist)) {
+		crpc = list_entry(console_session.ses_rpc_freelist.next,
 				      lstcon_rpc_t, crp_link);
-		cfs_list_del_init(&crpc->crp_link);
+		list_del_init(&crpc->crp_link);
 	}
 
 	spin_unlock(&console_session.ses_rpc_lock);
@@ -154,7 +154,7 @@ lstcon_rpc_put(lstcon_rpc_t *crpc)
         srpc_bulk_t *bulk = &crpc->crp_rpc->crpc_bulk;
         int          i;
 
-        LASSERT (cfs_list_empty(&crpc->crp_link));
+        LASSERT (list_empty(&crpc->crp_link));
 
         for (i = 0; i < bulk->bk_niov; i++) {
                 if (bulk->bk_iovs[i].kiov_page == NULL)
@@ -173,7 +173,7 @@ lstcon_rpc_put(lstcon_rpc_t *crpc)
 	} else {
 		spin_lock(&console_session.ses_rpc_lock);
 
-		cfs_list_add(&crpc->crp_link,
+		list_add(&crpc->crp_link,
 			     &console_session.ses_rpc_freelist);
 
 		spin_unlock(&console_session.ses_rpc_lock);
@@ -236,14 +236,13 @@ lstcon_rpc_trans_name(int transop)
 }
 
 int
-lstcon_rpc_trans_prep(cfs_list_t *translist,
+lstcon_rpc_trans_prep(struct list_head *translist,
                       int transop, lstcon_rpc_trans_t **transpp)
 {
         lstcon_rpc_trans_t *trans;
 
         if (translist != NULL) {
-                cfs_list_for_each_entry_typed(trans, translist,
-                                              lstcon_rpc_trans_t, tas_link) {
+                list_for_each_entry(trans, translist, tas_link) {
                         /* Can't enqueue two private transaction on
                          * the same object */
                         if ((trans->tas_opc & transop) == LST_TRANS_PRIVATE)
@@ -259,13 +258,13 @@ lstcon_rpc_trans_prep(cfs_list_t *translist,
         trans->tas_opc = transop;
 
 	if (translist == NULL)
-                CFS_INIT_LIST_HEAD(&trans->tas_olink);
+                INIT_LIST_HEAD(&trans->tas_olink);
         else
-                cfs_list_add_tail(&trans->tas_olink, translist);
+                list_add_tail(&trans->tas_olink, translist);
 
-        cfs_list_add_tail(&trans->tas_link, &console_session.ses_trans_list);
+        list_add_tail(&trans->tas_link, &console_session.ses_trans_list);
 
-        CFS_INIT_LIST_HEAD(&trans->tas_rpcs_list);
+        INIT_LIST_HEAD(&trans->tas_rpcs_list);
         cfs_atomic_set(&trans->tas_remaining, 0);
         cfs_waitq_init(&trans->tas_waitq);
 
@@ -280,7 +279,7 @@ lstcon_rpc_trans_prep(cfs_list_t *translist,
 void
 lstcon_rpc_trans_addreq(lstcon_rpc_trans_t *trans, lstcon_rpc_t *crpc)
 {
-        cfs_list_add_tail(&crpc->crp_link, &trans->tas_rpcs_list);
+        list_add_tail(&crpc->crp_link, &trans->tas_rpcs_list);
         crpc->crp_trans = trans;
 }
 
@@ -291,8 +290,7 @@ lstcon_rpc_trans_abort(lstcon_rpc_trans_t *trans, int error)
         lstcon_rpc_t      *crpc;
         lstcon_node_t     *nd;
 
-        cfs_list_for_each_entry_typed (crpc, &trans->tas_rpcs_list,
-                                       lstcon_rpc_t, crp_link) {
+        list_for_each_entry (crpc, &trans->tas_rpcs_list, crp_link) {
                 rpc = crpc->crp_rpc;
 
 		spin_lock(&rpc->crpc_lock);
@@ -330,7 +328,7 @@ static int
 lstcon_rpc_trans_check(lstcon_rpc_trans_t *trans)
 {
         if (console_session.ses_shutdown &&
-            !cfs_list_empty(&trans->tas_olink)) /* Not an end session RPC */
+            !list_empty(&trans->tas_olink)) /* Not an end session RPC */
                 return 1;
 
         return (cfs_atomic_read(&trans->tas_remaining) == 0) ? 1: 0;
@@ -342,7 +340,7 @@ lstcon_rpc_trans_postwait(lstcon_rpc_trans_t *trans, int timeout)
         lstcon_rpc_t  *crpc;
         int            rc;
 
-        if (cfs_list_empty(&trans->tas_rpcs_list))
+        if (list_empty(&trans->tas_rpcs_list))
                 return 0;
 
         if (timeout < LST_TRANS_MIN_TIMEOUT)
@@ -352,8 +350,7 @@ lstcon_rpc_trans_postwait(lstcon_rpc_trans_t *trans, int timeout)
                lstcon_rpc_trans_name(trans->tas_opc));
 
         /* post all requests */
-        cfs_list_for_each_entry_typed (crpc, &trans->tas_rpcs_list,
-                                       lstcon_rpc_t, crp_link) {
+        list_for_each_entry (crpc, &trans->tas_rpcs_list, crp_link) {
                 LASSERT (!crpc->crp_posted);
 
                 lstcon_rpc_post(crpc);
@@ -436,8 +433,7 @@ lstcon_rpc_trans_stat(lstcon_rpc_trans_t *trans, lstcon_trans_stat_t *stat)
 
         memset(stat, 0, sizeof(*stat));
 
-        cfs_list_for_each_entry_typed(crpc, &trans->tas_rpcs_list,
-                                      lstcon_rpc_t, crp_link) {
+        list_for_each_entry(crpc, &trans->tas_rpcs_list, crp_link) {
                 lstcon_rpc_stat_total(stat, 1);
 
                 LASSERT (crpc->crp_stamp != 0);
@@ -474,11 +470,11 @@ lstcon_rpc_trans_stat(lstcon_rpc_trans_t *trans, lstcon_trans_stat_t *stat)
 
 int
 lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
-                             cfs_list_t *head_up,
+                             struct list_head *head_up,
                              lstcon_rpc_readent_func_t readent)
 {
-        cfs_list_t            tmp;
-        cfs_list_t           *next;
+        struct list_head            tmp;
+        struct list_head           *next;
         lstcon_rpc_ent_t     *ent;
         srpc_generic_reply_t *rep;
         lstcon_rpc_t         *crpc;
@@ -492,10 +488,9 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
 
         next = head_up;
 
-        cfs_list_for_each_entry_typed(crpc, &trans->tas_rpcs_list,
-                                      lstcon_rpc_t, crp_link) {
+        list_for_each_entry(crpc, &trans->tas_rpcs_list, crp_link) {
                 if (cfs_copy_from_user(&tmp, next,
-                                       sizeof(cfs_list_t)))
+                                       sizeof(struct list_head)))
                         return -EFAULT;
 
                 if (tmp.next == head_up)
@@ -503,7 +498,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
 
                 next = tmp.next;
 
-                ent = cfs_list_entry(next, lstcon_rpc_ent_t, rpe_link);
+                ent = list_entry(next, lstcon_rpc_ent_t, rpe_link);
 
                 LASSERT (crpc->crp_stamp != 0);
 
@@ -554,9 +549,8 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
         lstcon_rpc_t      *tmp;
         int                count = 0;
 
-        cfs_list_for_each_entry_safe_typed(crpc, tmp,
-                                           &trans->tas_rpcs_list,
-                                           lstcon_rpc_t, crp_link) {
+        list_for_each_entry_safe(crpc, tmp,
+				 &trans->tas_rpcs_list, crp_link) {
                 rpc = crpc->crp_rpc;
 
 		spin_lock(&rpc->crpc_lock);
@@ -565,7 +559,7 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
 		if (!crpc->crp_posted || crpc->crp_finished) {
 			spin_unlock(&rpc->crpc_lock);
 
-                        cfs_list_del_init(&crpc->crp_link);
+                        list_del_init(&crpc->crp_link);
                         lstcon_rpc_put(crpc);
 
                         continue;
@@ -580,7 +574,7 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
 
                 crpc->crp_node  = NULL;
                 crpc->crp_trans = NULL;
-                cfs_list_del_init(&crpc->crp_link);
+                list_del_init(&crpc->crp_link);
                 count ++;
 
 		spin_unlock(&rpc->crpc_lock);
@@ -590,9 +584,9 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
 
         LASSERT (cfs_atomic_read(&trans->tas_remaining) == 0);
 
-        cfs_list_del(&trans->tas_link);
-        if (!cfs_list_empty(&trans->tas_olink))
-                cfs_list_del(&trans->tas_olink);
+        list_del(&trans->tas_link);
+        if (!list_empty(&trans->tas_olink))
+                list_del(&trans->tas_olink);
 
         CDEBUG(D_NET, "Transaction %s destroyed with %d pending RPCs\n",
                lstcon_rpc_trans_name(trans->tas_opc), count);
@@ -746,8 +740,7 @@ lstcon_dstnodes_prep(lstcon_group_t *grp, int idx,
         start = ((idx / dist) * span) % grp->grp_nnode;
         end   = ((idx / dist) * span + span - 1) % grp->grp_nnode;
 
-        cfs_list_for_each_entry_typed(ndl, &grp->grp_ndl_list,
-                                      lstcon_ndlink_t, ndl_link) {
+        list_for_each_entry(ndl, &grp->grp_ndl_list, ndl_link) {
                 nd = ndl->ndl_node;
                 if (i < start) {
                         i ++;
@@ -766,8 +759,7 @@ lstcon_dstnodes_prep(lstcon_group_t *grp, int idx,
         if (start <= end) /* done */
                 return 0;
 
-        cfs_list_for_each_entry_typed(ndl, &grp->grp_ndl_list,
-                                      lstcon_ndlink_t, ndl_link) {
+        list_for_each_entry(ndl, &grp->grp_ndl_list, ndl_link) {
                 if (i > grp->grp_nnode + end)
                         break;
 
@@ -1088,8 +1080,8 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
 }
 
 int
-lstcon_rpc_trans_ndlist(cfs_list_t *ndlist,
-                        cfs_list_t *translist, int transop,
+lstcon_rpc_trans_ndlist(struct list_head *ndlist,
+                        struct list_head *translist, int transop,
                         void *arg, lstcon_rpc_cond_func_t condition,
                         lstcon_rpc_trans_t **transpp)
 {
@@ -1109,7 +1101,7 @@ lstcon_rpc_trans_ndlist(cfs_list_t *ndlist,
         }
 
 	feats = trans->tas_features;
-        cfs_list_for_each_entry_typed(ndl, ndlist, lstcon_ndlink_t, ndl_link) {
+        list_for_each_entry(ndl, ndlist, ndl_link) {
                 rc = condition == NULL ? 1 :
                      condition(transop, ndl->ndl_node, arg);
 
@@ -1205,8 +1197,7 @@ lstcon_rpc_pinger(void *arg)
 
         LASSERT (trans != NULL);
 
-        cfs_list_for_each_entry_typed(ndl, &console_session.ses_ndl_list,
-                                      lstcon_ndlink_t, ndl_link) {
+        list_for_each_entry(ndl, &console_session.ses_ndl_list, ndl_link) {
                 nd = ndl->ndl_node;
 
                 if (console_session.ses_expired) {
@@ -1231,7 +1222,7 @@ lstcon_rpc_pinger(void *arg)
 
                 if (crpc->crp_rpc != NULL) {
                         LASSERT (crpc->crp_trans == trans);
-                        LASSERT (!cfs_list_empty(&crpc->crp_link));
+                        LASSERT (!list_empty(&crpc->crp_link));
 
 			spin_lock(&crpc->crp_rpc->crpc_lock);
 
@@ -1247,7 +1238,7 @@ lstcon_rpc_pinger(void *arg)
 
                         lstcon_rpc_get_reply(crpc, &rep);
 
-                        cfs_list_del_init(&crpc->crp_link);
+                        list_del_init(&crpc->crp_link);
 
                         lstcon_rpc_put(crpc);
                 }
@@ -1297,7 +1288,7 @@ lstcon_rpc_pinger_start(void)
         stt_timer_t    *ptimer;
         int             rc;
 
-        LASSERT (cfs_list_empty(&console_session.ses_rpc_freelist));
+        LASSERT (list_empty(&console_session.ses_rpc_freelist));
         LASSERT (cfs_atomic_read(&console_session.ses_rpc_counter) == 0);
 
         rc = lstcon_rpc_trans_prep(NULL, LST_TRANS_SESPING,
@@ -1336,16 +1327,16 @@ lstcon_rpc_cleanup_wait(void)
 {
         lstcon_rpc_trans_t *trans;
         lstcon_rpc_t       *crpc;
-        cfs_list_t         *pacer;
-        cfs_list_t          zlist;
+        struct list_head         *pacer;
+        struct list_head          zlist;
 
         /* Called with hold of global mutex */
 
         LASSERT (console_session.ses_shutdown);
 
-        while (!cfs_list_empty(&console_session.ses_trans_list)) { 
-                cfs_list_for_each(pacer, &console_session.ses_trans_list) {
-                        trans = cfs_list_entry(pacer, lstcon_rpc_trans_t,
+        while (!list_empty(&console_session.ses_trans_list)) { 
+                list_for_each(pacer, &console_session.ses_trans_list) {
+                        trans = list_entry(pacer, lstcon_rpc_trans_t,
                                                tas_link);
 
                         CDEBUG(D_NET, "Session closed, wakeup transaction %s\n",
@@ -1371,15 +1362,15 @@ lstcon_rpc_cleanup_wait(void)
                        "waiting for %d console RPCs to being recycled\n",
                        cfs_atomic_read(&console_session.ses_rpc_counter));
 
-        cfs_list_add(&zlist, &console_session.ses_rpc_freelist);
-        cfs_list_del_init(&console_session.ses_rpc_freelist);
+        list_add(&zlist, &console_session.ses_rpc_freelist);
+        list_del_init(&console_session.ses_rpc_freelist);
 
 	spin_unlock(&console_session.ses_rpc_lock);
 
-        while (!cfs_list_empty(&zlist)) {
-                crpc = cfs_list_entry(zlist.next, lstcon_rpc_t, crp_link);
+        while (!list_empty(&zlist)) {
+                crpc = list_entry(zlist.next, lstcon_rpc_t, crp_link);
 
-                cfs_list_del(&crpc->crp_link);
+                list_del(&crpc->crp_link);
                 LIBCFS_FREE(crpc, sizeof(lstcon_rpc_t));
         }
 }
@@ -1387,7 +1378,7 @@ lstcon_rpc_cleanup_wait(void)
 int
 lstcon_rpc_module_init(void)
 {
-        CFS_INIT_LIST_HEAD(&console_session.ses_ping_timer.stt_list);
+        INIT_LIST_HEAD(&console_session.ses_ping_timer.stt_list);
         console_session.ses_ping_timer.stt_func = lstcon_rpc_pinger;
         console_session.ses_ping_timer.stt_data = &console_session.ses_ping_timer;
 
@@ -1395,7 +1386,7 @@ lstcon_rpc_module_init(void)
 
 	spin_lock_init(&console_session.ses_rpc_lock);
 	cfs_atomic_set(&console_session.ses_rpc_counter, 0);
-	CFS_INIT_LIST_HEAD(&console_session.ses_rpc_freelist);
+	INIT_LIST_HEAD(&console_session.ses_rpc_freelist);
 
 	return 0;
 }
@@ -1403,7 +1394,7 @@ lstcon_rpc_module_init(void)
 void
 lstcon_rpc_module_fini(void)
 {
-        LASSERT (cfs_list_empty(&console_session.ses_rpc_freelist));
+        LASSERT (list_empty(&console_session.ses_rpc_freelist));
         LASSERT (cfs_atomic_read(&console_session.ses_rpc_counter) == 0);
 }
 

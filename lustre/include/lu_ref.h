@@ -128,7 +128,7 @@ struct lu_ref {
          * List of all outstanding references (each represented by struct
          * lu_ref_link), pointing to this object.
          */
-        cfs_list_t           lf_list;
+        struct list_head           lf_list;
         /**
          * # of links.
          */
@@ -150,7 +150,7 @@ struct lu_ref {
         /**
          * Linkage into a global list of all lu_ref's (lu_ref_refs).
          */
-        cfs_list_t           lf_linkage;
+        struct list_head           lf_linkage;
 };
 
 void lu_ref_init_loc(struct lu_ref *ref, const char *func, const int line);

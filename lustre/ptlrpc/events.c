@@ -280,7 +280,7 @@ static void ptlrpc_req_add_history(struct ptlrpc_service_part *svcpt,
 
 	req->rq_history_seq = new_seq;
 
-	cfs_list_add_tail(&req->rq_history_list, &svcpt->scp_hist_reqs);
+	list_add_tail(&req->rq_history_list, &svcpt->scp_hist_reqs);
 }
 
 /*
@@ -342,8 +342,8 @@ void request_in_callback(lnet_event_t *ev)
         req->rq_rqbd = rqbd;
         req->rq_phase = RQ_PHASE_NEW;
 	spin_lock_init(&req->rq_lock);
-        CFS_INIT_LIST_HEAD(&req->rq_timed_list);
-	CFS_INIT_LIST_HEAD(&req->rq_exp_list);
+        INIT_LIST_HEAD(&req->rq_timed_list);
+	INIT_LIST_HEAD(&req->rq_exp_list);
         cfs_atomic_set(&req->rq_refcount, 1);
         if (ev->type == LNET_EVENT_PUT)
                 CDEBUG(D_INFO, "incoming req@%p x"LPU64" msgsize %u\n",
@@ -374,7 +374,7 @@ void request_in_callback(lnet_event_t *ev)
                 rqbd->rqbd_refcount++;
         }
 
-	cfs_list_add_tail(&req->rq_list, &svcpt->scp_req_incoming);
+	list_add_tail(&req->rq_list, &svcpt->scp_req_incoming);
 	svcpt->scp_nreqs_incoming++;
 
 	/* NB everything can disappear under us once the request
@@ -638,12 +638,12 @@ int ptlrpc_ni_init(void)
 }
 
 #ifndef __KERNEL__
-CFS_LIST_HEAD(liblustre_wait_callbacks);
-CFS_LIST_HEAD(liblustre_idle_callbacks);
+LIST_HEAD(liblustre_wait_callbacks);
+LIST_HEAD(liblustre_idle_callbacks);
 void *liblustre_services_callback;
 
 void *
-liblustre_register_waitidle_callback (cfs_list_t *callback_list,
+liblustre_register_waitidle_callback (struct list_head *callback_list,
                                       const char *name,
                                       int (*fn)(void *arg), void *arg)
 {
@@ -655,7 +655,7 @@ liblustre_register_waitidle_callback (cfs_list_t *callback_list,
         llwc->llwc_name = name;
         llwc->llwc_fn = fn;
         llwc->llwc_arg = arg;
-        cfs_list_add_tail(&llwc->llwc_list, callback_list);
+        list_add_tail(&llwc->llwc_list, callback_list);
 
         return (llwc);
 }
@@ -665,7 +665,7 @@ liblustre_deregister_waitidle_callback (void *opaque)
 {
         struct liblustre_wait_callback *llwc = opaque;
 
-        cfs_list_del(&llwc->llwc_list);
+        list_del(&llwc->llwc_list);
         OBD_FREE(llwc, sizeof(*llwc));
 }
 
@@ -727,7 +727,7 @@ int liblustre_waiting = 0;
 int
 liblustre_wait_event (int timeout)
 {
-        cfs_list_t                     *tmp;
+        struct list_head                     *tmp;
         struct liblustre_wait_callback *llwc;
         int                             found_something = 0;
 
@@ -740,8 +740,8 @@ liblustre_wait_event (int timeout)
                         found_something = 1;
 
                 /* Give all registered callbacks a bite at the cherry */
-                cfs_list_for_each(tmp, &liblustre_wait_callbacks) {
-                        llwc = cfs_list_entry(tmp,
+                list_for_each(tmp, &liblustre_wait_callbacks) {
+                        llwc = list_entry(tmp,
                                               struct liblustre_wait_callback,
                                               llwc_list);
 
@@ -768,7 +768,7 @@ liblustre_wait_idle(void)
 {
         static int recursed = 0;
 
-        cfs_list_t                     *tmp;
+        struct list_head                     *tmp;
         struct liblustre_wait_callback *llwc;
         int                             idle = 0;
 
@@ -780,8 +780,8 @@ liblustre_wait_idle(void)
 
                 idle = 1;
 
-                cfs_list_for_each(tmp, &liblustre_idle_callbacks) {
-                        llwc = cfs_list_entry(tmp,
+                list_for_each(tmp, &liblustre_idle_callbacks) {
+                        llwc = list_entry(tmp,
                                               struct liblustre_wait_callback,
                                               llwc_list);
 

@@ -866,7 +866,7 @@ struct lu_local_obj_desc {
         __u32                            llod_oid;
         int                              llod_is_index;
         const struct dt_index_features  *llod_feat;
-        cfs_list_t                       llod_linkage;
+        struct list_head                       llod_linkage;
 };
 
 struct md_object *llo_store_resolve(const struct lu_env *env,

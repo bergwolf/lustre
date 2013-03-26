@@ -114,8 +114,8 @@ struct nrs_core {
 	 */
 	struct list_head nrs_policies;
 #else
-	struct cfs_list_head nrs_heads;
-	struct cfs_list_head nrs_policies;
+	struct list_head nrs_heads;
+	struct list_head nrs_policies;
 #endif
 
 };

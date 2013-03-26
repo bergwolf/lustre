@@ -177,7 +177,7 @@ typedef struct {
 
 /* message buffer descriptor */
 typedef struct srpc_buffer {
-        cfs_list_t           buf_list; /* chain on srpc_service::*_msgq */
+        struct list_head           buf_list; /* chain on srpc_service::*_msgq */
         srpc_msg_t           buf_msg;
         lnet_handle_md_t     buf_mdh;
         lnet_nid_t           buf_self;
@@ -197,7 +197,7 @@ typedef struct swi_workitem {
 /* server-side state of a RPC */
 typedef struct srpc_server_rpc {
 	/* chain on srpc_service::*_rpcq */
-	cfs_list_t		srpc_list;
+	struct list_head		srpc_list;
 	struct srpc_service_cd *srpc_scd;
         swi_workitem_t       srpc_wi;
         srpc_event_t         srpc_ev;      /* bulk/reply event */
@@ -215,7 +215,7 @@ typedef struct srpc_server_rpc {
 
 /* client-side state of a RPC */
 typedef struct srpc_client_rpc {
-	cfs_list_t		crpc_list;	/* chain on user's lists */
+	struct list_head		crpc_list;	/* chain on user's lists */
 	spinlock_t		crpc_lock;	/* serialize */
         int                  crpc_service;
         cfs_atomic_t         crpc_refcount;
@@ -281,9 +281,9 @@ struct srpc_service_cd {
 	/** event buffer */
 	srpc_event_t		scd_ev;
 	/** free RPC descriptors */
-	cfs_list_t		scd_rpc_free;
+	struct list_head		scd_rpc_free;
 	/** in-flight RPCs */
-	cfs_list_t		scd_rpc_active;
+	struct list_head		scd_rpc_active;
 	/** workitem for posting buffer */
 	swi_workitem_t		scd_buf_wi;
 	/** CPT id */
@@ -303,9 +303,9 @@ struct srpc_service_cd {
 	/** increase/decrease some buffers */
 	int			scd_buf_adjust;
 	/** posted message buffers */
-	cfs_list_t		scd_buf_posted;
+	struct list_head		scd_buf_posted;
 	/** blocked for RPC descriptor */
-	cfs_list_t		scd_buf_blocked;
+	struct list_head		scd_buf_blocked;
 };
 
 /* number of server workitems (mini-thread) for testing service */
@@ -336,13 +336,13 @@ typedef struct srpc_service {
 } srpc_service_t;
 
 typedef struct {
-        cfs_list_t        sn_list;    /* chain on fw_zombie_sessions */
+        struct list_head        sn_list;    /* chain on fw_zombie_sessions */
         lst_sid_t         sn_id;      /* unique identifier */
         unsigned int      sn_timeout; /* # seconds' inactivity to expire */
         int               sn_timer_active;
 	unsigned int	  sn_features;
         stt_timer_t       sn_timer;
-        cfs_list_t        sn_batches; /* list of batches */
+        struct list_head        sn_batches; /* list of batches */
         char              sn_name[LST_NAME_SIZE];
         cfs_atomic_t      sn_refcount;
         cfs_atomic_t      sn_brw_errors;
@@ -354,12 +354,12 @@ typedef struct {
                                        (sid0).ses_stamp == (sid1).ses_stamp)
 
 typedef struct {
-        cfs_list_t        bat_list;      /* chain on sn_batches */
+        struct list_head        bat_list;      /* chain on sn_batches */
         lst_bid_t         bat_id;        /* batch id */
         int               bat_error;     /* error code of batch */
         sfw_session_t    *bat_session;   /* batch's session */
         cfs_atomic_t      bat_nactive;   /* # of active tests */
-        cfs_list_t        bat_tests;     /* test instances */
+        struct list_head        bat_tests;     /* test instances */
 } sfw_batch_t;
 
 typedef struct {
@@ -373,7 +373,7 @@ typedef struct {
 } sfw_test_client_ops_t;
 
 typedef struct sfw_test_instance {
-        cfs_list_t              tsi_list;         /* chain on batch */
+        struct list_head              tsi_list;         /* chain on batch */
         int                     tsi_service;      /* test type */
         sfw_batch_t            *tsi_batch;        /* batch */
         sfw_test_client_ops_t  *tsi_ops;          /* test client operations */
@@ -388,9 +388,9 @@ typedef struct sfw_test_instance {
 	spinlock_t		tsi_lock;	  /* serialize */
 	unsigned int		tsi_stopping:1;   /* test is stopping */
         cfs_atomic_t            tsi_nactive;      /* # of active test unit */
-        cfs_list_t              tsi_units;        /* test units */
-        cfs_list_t              tsi_free_rpcs;    /* free rpcs */
-        cfs_list_t              tsi_active_rpcs;  /* active rpcs */
+        struct list_head              tsi_units;        /* test units */
+        struct list_head              tsi_free_rpcs;    /* free rpcs */
+        struct list_head              tsi_active_rpcs;  /* active rpcs */
 
 	union {
 		test_ping_req_t		ping;	  /* ping parameter */
@@ -407,7 +407,7 @@ typedef struct sfw_test_instance {
 #define sfw_id_pages(n)    (((n) + SFW_ID_PER_PAGE - 1) / SFW_ID_PER_PAGE)
 
 typedef struct sfw_test_unit {
-        cfs_list_t            tsu_list;         /* chain on lst_test_instance */
+        struct list_head            tsu_list;         /* chain on lst_test_instance */
         lnet_process_id_t     tsu_dest;         /* id of dest node */
         int                   tsu_loop;         /* loop count of the test */
         sfw_test_instance_t  *tsu_instance;     /* pointer to test instance */
@@ -416,7 +416,7 @@ typedef struct sfw_test_unit {
 } sfw_test_unit_t;
 
 typedef struct sfw_test_case {
-        cfs_list_t              tsc_list;         /* chain on fw_tests */
+        struct list_head              tsc_list;         /* chain on fw_tests */
         srpc_service_t         *tsc_srv_service;  /* test service */
         sfw_test_client_ops_t  *tsc_cli_ops;      /* ops of test client */
 } sfw_test_case_t;
@@ -548,7 +548,7 @@ srpc_init_client_rpc (srpc_client_rpc_t *rpc, lnet_process_id_t peer,
         memset(rpc, 0, offsetof(srpc_client_rpc_t,
                                 crpc_bulk.bk_iovs[nbulkiov]));
 
-        CFS_INIT_LIST_HEAD(&rpc->crpc_list);
+        INIT_LIST_HEAD(&rpc->crpc_list);
 	swi_init_workitem(&rpc->crpc_wi, rpc, srpc_send_rpc,
 			  lst_sched_test[lnet_cpt_of_nid(peer.nid)]);
 	spin_lock_init(&rpc->crpc_lock);

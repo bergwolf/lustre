@@ -169,7 +169,7 @@ typedef struct _KS_TSDU {
     ULONG                 Magic;          /* magic */
     ULONG                 Flags;          /* flags */
 
-    cfs_list_t            Link;           /* link list */
+    struct list_head            Link;           /* link list */
 
     ULONG                 TotalLength;    /* total size of KS_TSDU */
     ULONG                 StartOffset;    /* offset of the first Tsdu unit */
@@ -238,19 +238,19 @@ typedef struct ks_engine_mgr {
 	int		stop;
 	event_t		exit;
 	event_t		start;
-	cfs_list_t	list;
+	struct list_head	list;
 } ks_engine_mgr_t;
 
 typedef struct ks_engine_slot {
     ks_tconn_t *            tconn;
     void *                  tsdumgr;
-    cfs_list_t              link;
+    struct list_head              link;
     int                     queued;
     ks_engine_mgr_t *       emgr;
 } ks_engine_slot_t;
 
 typedef struct _KS_TSDUMGR {
-	cfs_list_t		TsduList;
+	struct list_head		TsduList;
 	ULONG			NumOfTsdu;
 	ULONG			TotalBytes;
 	KEVENT			Event;
@@ -353,7 +353,7 @@ typedef KS_DISCONNECT_WORKITEM      ks_disconnect_t;
 
 typedef struct ks_backlogs {
 
-        cfs_list_t           list;   /* list to link the backlog connections */
+        struct list_head           list;   /* list to link the backlog connections */
         int                  num;    /* number of backlogs in the list */
 
 } ks_backlogs_t;
@@ -365,7 +365,7 @@ typedef struct ks_daemon {
     unsigned short          nbacklogs;   /* number of listening backlog conns */
     unsigned short          port;        /* listening port number */ 
     int                     shutdown;    /* daemon threads is to exit */
-    cfs_list_t              list;        /* to be attached into ks_nal_data_t */
+    struct list_head              list;        /* to be attached into ks_nal_data_t */
 
 } ks_daemon_t;
 
@@ -437,7 +437,7 @@ struct socket {
 
         cfs_atomic_t                kstc_refcount;   /* reference count of ks_tconn_t */
 
-        cfs_list_t                  kstc_list;       /* linked to global ksocknal_data */
+        struct list_head                  kstc_list;       /* linked to global ksocknal_data */
 
         union {
 
@@ -462,7 +462,7 @@ struct socket {
                 int                   kstc_busy;      /* referred by ConnectEventCallback ? */
                 int                   kstc_accepted;  /* the connection is built ready ? */
 
-                cfs_list_t            kstc_link;      /* linked to parent tdi connection */
+                struct list_head            kstc_link;      /* linked to parent tdi connection */
                 ks_tconn_t   *        kstc_parent;    /* pointers to it's listener parent */
             } child;
 
@@ -638,7 +638,7 @@ typedef struct {
 	spinlock_t	ksnd_tconn_lock;	/* tdi connections access lock*/
 
 	int		ksnd_ntconns;		/* number of tconns in list */
-	cfs_list_t	ksnd_tconns;		/* tdi connections list */
+	struct list_head	ksnd_tconns;		/* tdi connections list */
 	cfs_mem_cache_t *ksnd_tconn_slab;	/* ks_tconn_t allocation slabs*/
 	event_t		ksnd_tconn_exit;	/* event signal by last tconn */
 
@@ -649,7 +649,7 @@ typedef struct {
     cfs_mem_cache_t       *ksnd_tsdu_slab;       /* slab cache for tsdu buffer allocation */
 
     int                   ksnd_nfreetsdus;      /* number of tsdu buffers in the freed list */
-    cfs_list_t            ksnd_freetsdus;       /* List of the freed Tsdu buffer. */
+    struct list_head            ksnd_freetsdus;       /* List of the freed Tsdu buffer. */
 
     int                   ksnd_engine_nums;     /* number of tcp sending engine threads */
     ks_engine_mgr_t       *ksnd_engine_mgr;      /* tcp sending engine structure */

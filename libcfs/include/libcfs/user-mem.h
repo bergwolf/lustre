@@ -40,7 +40,7 @@
 typedef struct page {
         void   *addr;
         unsigned long index;
-        cfs_list_t list;
+        struct list_head list;
         unsigned long private;
 
         /* internally used by liblustre file i/o */
@@ -49,7 +49,7 @@ typedef struct page {
 #ifdef LIBLUSTRE_HANDLE_UNALIGNED_PAGE
         int     _managed;
 #endif
-        cfs_list_t _node;
+        struct list_head _node;
 } cfs_page_t;
 
 

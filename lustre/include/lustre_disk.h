@@ -520,7 +520,7 @@ struct lustre_mount_info {
         char                 *lmi_name;
         struct super_block   *lmi_sb;
         struct vfsmount      *lmi_mnt;
-        cfs_list_t            lmi_list_chain;
+        struct list_head            lmi_list_chain;
 };
 
 /* on-disk structure describing local object OIDs storage

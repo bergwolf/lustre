@@ -55,8 +55,7 @@ brw_client_fini (sfw_test_instance_t *tsi)
 
         LASSERT (tsi->tsi_is_client);
 
-        cfs_list_for_each_entry_typed (tsu, &tsi->tsi_units,
-                                       sfw_test_unit_t, tsu_list) {
+        list_for_each_entry (tsu, &tsi->tsi_units, tsu_list) {
                 bulk = tsu->tsu_private;
                 if (bulk == NULL) continue;
 
@@ -112,8 +111,7 @@ brw_client_init (sfw_test_instance_t *tsi)
 	    flags != LST_BRW_CHECK_FULL && flags != LST_BRW_CHECK_SIMPLE)
 		return -EINVAL;
 
-	cfs_list_for_each_entry_typed(tsu, &tsi->tsi_units,
-				      sfw_test_unit_t, tsu_list) {
+	list_for_each_entry(tsu, &tsi->tsi_units, tsu_list) {
 		bulk = srpc_alloc_bulk(lnet_cpt_of_nid(tsu->tsu_dest.nid),
 				       npg, len, opc == LST_BRW_READ);
                 if (bulk == NULL) {

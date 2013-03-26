@@ -4680,7 +4680,7 @@ static int mdt_init0(const struct lu_env *env, struct mdt_device *m,
         m->mdt_ck_timeout = CAPA_KEY_TIMEOUT;
         m->mdt_squash_uid = 0;
         m->mdt_squash_gid = 0;
-        CFS_INIT_LIST_HEAD(&m->mdt_nosquash_nids);
+        INIT_LIST_HEAD(&m->mdt_nosquash_nids);
         m->mdt_nosquash_str = NULL;
         m->mdt_nosquash_strlen = 0;
 	init_rwsem(&m->mdt_squash_sem);
@@ -5347,20 +5347,20 @@ static int mdt_export_cleanup(struct obd_export *exp)
         struct mdt_device      *mdt;
         struct mdt_thread_info *info;
         struct lu_env           env;
-        CFS_LIST_HEAD(closing_list);
+        LIST_HEAD(closing_list);
         struct mdt_file_data *mfd, *n;
         int rc = 0;
         ENTRY;
 
 	spin_lock(&med->med_open_lock);
-	while (!cfs_list_empty(&med->med_open_head)) {
-		cfs_list_t *tmp = med->med_open_head.next;
-		mfd = cfs_list_entry(tmp, struct mdt_file_data, mfd_list);
+	while (!list_empty(&med->med_open_head)) {
+		struct list_head *tmp = med->med_open_head.next;
+		mfd = list_entry(tmp, struct mdt_file_data, mfd_list);
 
 		/* Remove mfd handle so it can't be found again.
 		 * We are consuming the mfd_list reference here. */
 		class_handle_unhash(&mfd->mfd_handle);
-		cfs_list_move_tail(&mfd->mfd_list, &closing_list);
+		list_move_tail(&mfd->mfd_list, &closing_list);
 	}
 	spin_unlock(&med->med_open_lock);
         mdt = mdt_dev(obd->obd_lu_dev);
@@ -5377,12 +5377,12 @@ static int mdt_export_cleanup(struct obd_export *exp)
         info->mti_mdt = mdt;
         info->mti_exp = exp;
 
-        if (!cfs_list_empty(&closing_list)) {
+        if (!list_empty(&closing_list)) {
                 struct md_attr *ma = &info->mti_attr;
 
                 /* Close any open files (which may also cause orphan unlinking). */
-                cfs_list_for_each_entry_safe(mfd, n, &closing_list, mfd_list) {
-                        cfs_list_del_init(&mfd->mfd_list);
+                list_for_each_entry_safe(mfd, n, &closing_list, mfd_list) {
+                        list_del_init(&mfd->mfd_list);
 			ma->ma_need = ma->ma_valid = 0;
 			/* Don't unlink orphan on failover umount, LU-184 */
 			if (exp->exp_flags & OBD_OPT_FAILOVER) {
@@ -5426,7 +5426,7 @@ static int mdt_init_export(struct obd_export *exp)
         int                     rc;
         ENTRY;
 
-        CFS_INIT_LIST_HEAD(&med->med_open_head);
+        INIT_LIST_HEAD(&med->med_open_head);
 	spin_lock_init(&med->med_open_lock);
 	mutex_init(&med->med_idmap_mutex);
 	med->med_idmap = NULL;
@@ -5474,8 +5474,8 @@ static int mdt_destroy_export(struct obd_export *exp)
         ldlm_destroy_export(exp);
         tgt_client_free(exp);
 
-        LASSERT(cfs_list_empty(&exp->exp_outstanding_replies));
-        LASSERT(cfs_list_empty(&exp->exp_mdt_data.med_open_head));
+        LASSERT(list_empty(&exp->exp_outstanding_replies));
+        LASSERT(list_empty(&exp->exp_mdt_data.med_open_head));
 
         RETURN(0);
 }

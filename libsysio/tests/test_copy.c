@@ -49,7 +49,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/uio.h>
-#include <sys/queue.h>
 #include <getopt.h>
 
 #if defined(SYSIO_LABEL_NAMES)

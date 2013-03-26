@@ -155,7 +155,7 @@ ptlrpcd_select_pc(struct ptlrpc_request *req, pdl_policy_t policy, int index)
  */
 void ptlrpcd_add_rqset(struct ptlrpc_request_set *set)
 {
-        cfs_list_t *tmp, *pos;
+        struct list_head *tmp, *pos;
 #ifdef __KERNEL__
         struct ptlrpcd_ctl *pc;
         struct ptlrpc_request_set *new;
@@ -165,9 +165,9 @@ void ptlrpcd_add_rqset(struct ptlrpc_request_set *set)
         new = pc->pc_set;
 #endif
 
-        cfs_list_for_each_safe(pos, tmp, &set->set_requests) {
+        list_for_each_safe(pos, tmp, &set->set_requests) {
                 struct ptlrpc_request *req =
-                        cfs_list_entry(pos, struct ptlrpc_request,
+                        list_entry(pos, struct ptlrpc_request,
                                        rq_set_chain);
 
                 LASSERT(req->rq_phase == RQ_PHASE_NEW);
@@ -175,7 +175,7 @@ void ptlrpcd_add_rqset(struct ptlrpc_request_set *set)
                 req->rq_set = new;
                 req->rq_queued_time = cfs_time_current();
 #else
-                cfs_list_del_init(&req->rq_set_chain);
+                list_del_init(&req->rq_set_chain);
                 req->rq_set = NULL;
                 ptlrpcd_add_req(req, PDL_POLICY_LOCAL, -1);
                 cfs_atomic_dec(&set->set_remaining);
@@ -184,7 +184,7 @@ void ptlrpcd_add_rqset(struct ptlrpc_request_set *set)
 
 #ifdef __KERNEL__
 	spin_lock(&new->set_new_req_lock);
-	cfs_list_splice_init(&set->set_requests, &new->set_new_requests);
+	list_splice_init(&set->set_requests, &new->set_new_requests);
 	i = cfs_atomic_read(&set->set_remaining);
 	count = cfs_atomic_add_return(i, &new->set_new_count);
 	cfs_atomic_set(&set->set_remaining, 0);
@@ -209,18 +209,18 @@ EXPORT_SYMBOL(ptlrpcd_add_rqset);
 static int ptlrpcd_steal_rqset(struct ptlrpc_request_set *des,
                                struct ptlrpc_request_set *src)
 {
-        cfs_list_t *tmp, *pos;
+        struct list_head *tmp, *pos;
         struct ptlrpc_request *req;
         int rc = 0;
 
 	spin_lock(&src->set_new_req_lock);
-        if (likely(!cfs_list_empty(&src->set_new_requests))) {
-                cfs_list_for_each_safe(pos, tmp, &src->set_new_requests) {
-                        req = cfs_list_entry(pos, struct ptlrpc_request,
+        if (likely(!list_empty(&src->set_new_requests))) {
+                list_for_each_safe(pos, tmp, &src->set_new_requests) {
+                        req = list_entry(pos, struct ptlrpc_request,
                                              rq_set_chain);
                         req->rq_set = des;
                 }
-                cfs_list_splice_init(&src->set_new_requests,
+                list_splice_init(&src->set_new_requests,
                                      &des->set_requests);
                 rc = cfs_atomic_read(&src->set_new_count);
                 cfs_atomic_add(rc, &des->set_remaining);
@@ -285,7 +285,7 @@ static inline void ptlrpc_reqset_get(struct ptlrpc_request_set *set)
  */
 static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
 {
-        cfs_list_t *tmp, *pos;
+        struct list_head *tmp, *pos;
         struct ptlrpc_request *req;
         struct ptlrpc_request_set *set = pc->pc_set;
         int rc = 0;
@@ -294,8 +294,8 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
 
         if (cfs_atomic_read(&set->set_new_count)) {
 		spin_lock(&set->set_new_req_lock);
-                if (likely(!cfs_list_empty(&set->set_new_requests))) {
-                        cfs_list_splice_init(&set->set_new_requests,
+                if (likely(!list_empty(&set->set_new_requests))) {
+                        list_splice_init(&set->set_new_requests,
                                              &set->set_requests);
                         cfs_atomic_add(cfs_atomic_read(&set->set_new_count),
                                        &set->set_remaining);
@@ -330,18 +330,18 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
         if (cfs_atomic_read(&set->set_remaining))
                 rc |= ptlrpc_check_set(env, set);
 
-        if (!cfs_list_empty(&set->set_requests)) {
+        if (!list_empty(&set->set_requests)) {
                 /*
                  * XXX: our set never completes, so we prune the completed
                  * reqs after each iteration. boy could this be smarter.
                  */
-                cfs_list_for_each_safe(pos, tmp, &set->set_requests) {
-                        req = cfs_list_entry(pos, struct ptlrpc_request,
+                list_for_each_safe(pos, tmp, &set->set_requests) {
+                        req = list_entry(pos, struct ptlrpc_request,
                                              rq_set_chain);
                         if (req->rq_phase != RQ_PHASE_COMPLETE)
                                 continue;
 
-                        cfs_list_del_init(&req->rq_set_chain);
+                        list_del_init(&req->rq_set_chain);
                         req->rq_set = NULL;
                         ptlrpc_req_finished(req);
                 }
@@ -475,7 +475,7 @@ static int ptlrpcd(void *arg)
         /*
          * Wait for inflight requests to drain.
          */
-        if (!cfs_list_empty(&set->set_requests))
+        if (!list_empty(&set->set_requests))
                 ptlrpc_set_wait(set);
         lu_context_fini(&env.le_ctx);
 

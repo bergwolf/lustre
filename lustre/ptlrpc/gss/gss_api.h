@@ -99,7 +99,7 @@ struct subflavor_desc {
 
 /* Each mechanism is described by the following struct: */
 struct gss_api_mech {
-        cfs_list_t              gm_list;
+        struct list_head              gm_list;
         cfs_module_t           *gm_owner;
         char                   *gm_name;
         rawobj_t                gm_oid;

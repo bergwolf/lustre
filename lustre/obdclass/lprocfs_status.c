@@ -1040,7 +1040,7 @@ int lprocfs_rd_import(char *page, char **start, off_t off, int count,
                       "       failover_nids: [");
 	spin_lock(&imp->imp_lock);
         j = 0;
-        cfs_list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+        list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
                 i += snprintf(page + i, count - i, "%s%s", j ? ", " : "",
                               libcfs_nid2str(conn->oic_conn->c_peer.nid));
                 j++;
@@ -1351,10 +1351,10 @@ void lprocfs_free_per_client_stats(struct obd_device *obd)
 
         /* we need extra list - because hash_exit called to early */
         /* not need locking because all clients is died */
-        while (!cfs_list_empty(&obd->obd_nid_stats)) {
-                stat = cfs_list_entry(obd->obd_nid_stats.next,
+        while (!list_empty(&obd->obd_nid_stats)) {
+                stat = list_entry(obd->obd_nid_stats.next,
                                       struct nid_stat, nid_list);
-                cfs_list_del_init(&stat->nid_list);
+                list_del_init(&stat->nid_list);
                 cfs_hash_del(hash, &stat->nid, &stat->nid_hash);
                 lprocfs_free_client_stats(stat);
         }
@@ -1922,7 +1922,7 @@ lprocfs_exp_rd_cb_data_init(struct exp_uuid_cb_data *cb_data, char *page,
 }
 
 int lprocfs_exp_print_uuid(cfs_hash_t *hs, cfs_hash_bd_t *bd,
-                           cfs_hlist_node_t *hnode, void *cb_data)
+                           struct hlist_node *hnode, void *cb_data)
 
 {
         struct obd_export *exp = cfs_hash_object(hs, hnode);
@@ -1952,7 +1952,7 @@ int lprocfs_exp_rd_uuid(char *page, char **start, off_t off, int count,
 }
 
 int lprocfs_exp_print_hash(cfs_hash_t *hs, cfs_hash_bd_t *bd,
-                           cfs_hlist_node_t *hnode, void *cb_data)
+                           struct hlist_node *hnode, void *cb_data)
 
 {
         struct exp_uuid_cb_data *data = cb_data;
@@ -2006,7 +2006,7 @@ static int lprocfs_nid_stats_clear_write_cb(void *obj, void *data)
         if (cfs_atomic_read(&stat->nid_exp_ref_count) == 1) {
                 /* object has only hash references. */
 		spin_lock(&stat->nid_obd->obd_nid_lock);
-		cfs_list_move(&stat->nid_list, data);
+		list_move(&stat->nid_list, data);
 		spin_unlock(&stat->nid_obd->obd_nid_lock);
                 RETURN(1);
         }
@@ -2022,15 +2022,15 @@ int lprocfs_nid_stats_clear_write(struct file *file, const char *buffer,
 {
         struct obd_device *obd = (struct obd_device *)data;
         struct nid_stat *client_stat;
-        CFS_LIST_HEAD(free_list);
+        LIST_HEAD(free_list);
 
         cfs_hash_cond_del(obd->obd_nid_stats_hash,
                           lprocfs_nid_stats_clear_write_cb, &free_list);
 
-        while (!cfs_list_empty(&free_list)) {
-                client_stat = cfs_list_entry(free_list.next, struct nid_stat,
+        while (!list_empty(&free_list)) {
+                client_stat = list_entry(free_list.next, struct nid_stat,
                                              nid_list);
-                cfs_list_del_init(&client_stat->nid_list);
+                list_del_init(&client_stat->nid_list);
                 lprocfs_free_client_stats(client_stat);
         }
 
@@ -2128,7 +2128,7 @@ int lprocfs_exp_setup(struct obd_export *exp, lnet_nid_t *nid, int *newnid)
         *newnid = 1;
         /* protect competitive add to list, not need locking on destroy */
 	spin_lock(&obd->obd_nid_lock);
-	cfs_list_add(&new_stat->nid_list, &obd->obd_nid_stats);
+	list_add(&new_stat->nid_list, &obd->obd_nid_stats);
 	spin_unlock(&obd->obd_nid_lock);
 
         RETURN(rc);

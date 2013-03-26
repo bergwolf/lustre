@@ -53,14 +53,14 @@ struct l_file *l_dentry_open(struct lvfs_run_ctxt *, struct l_dentry *,
                              int flags);
 
 struct l_linux_dirent {
-        cfs_list_t      lld_list;
+        struct list_head      lld_list;
         ino_t           lld_ino;
         unsigned long   lld_off;
         char            lld_name[LL_FID_NAMELEN];
 };
 struct l_readdir_callback {
         struct l_linux_dirent *lrc_dirent;
-        cfs_list_t            *lrc_list;
+        struct list_head            *lrc_list;
 };
 
 #endif /*  __LVFS_LINUX_H__ */

@@ -84,7 +84,7 @@ struct ofd_seq *ofd_seq_get(struct ofd_device *ofd, obd_seq seq)
 	struct ofd_seq *oseq;
 
 	read_lock(&ofd->ofd_seq_list_lock);
-	cfs_list_for_each_entry(oseq, &ofd->ofd_seq_list, os_list) {
+	list_for_each_entry(oseq, &ofd->ofd_seq_list, os_list) {
 		if (oseq->os_seq == seq) {
 			cfs_atomic_inc(&oseq->os_refc);
 			read_unlock(&ofd->ofd_seq_list_lock);
@@ -98,7 +98,7 @@ struct ofd_seq *ofd_seq_get(struct ofd_device *ofd, obd_seq seq)
 static void ofd_seq_destroy(const struct lu_env *env,
 			    struct ofd_seq *oseq)
 {
-	LASSERT(cfs_list_empty(&oseq->os_list));
+	LASSERT(list_empty(&oseq->os_list));
 	LASSERT(oseq->os_lastid_obj != NULL);
 	lu_object_put(env, &oseq->os_lastid_obj->do_lu);
 	OBD_FREE_PTR(oseq);
@@ -112,7 +112,7 @@ void ofd_seq_put(const struct lu_env *env, struct ofd_seq *oseq)
 
 static void ofd_seq_delete(const struct lu_env *env, struct ofd_seq *oseq)
 {
-	cfs_list_del_init(&oseq->os_list);
+	list_del_init(&oseq->os_list);
 	ofd_seq_put(env, oseq);
 }
 
@@ -131,7 +131,7 @@ static struct ofd_seq *ofd_seq_add(const struct lu_env *env,
 	struct ofd_seq *os = NULL;
 
 	write_lock(&ofd->ofd_seq_list_lock);
-	cfs_list_for_each_entry(os, &ofd->ofd_seq_list, os_list) {
+	list_for_each_entry(os, &ofd->ofd_seq_list, os_list) {
 		if (os->os_seq == new_seq->os_seq) {
 			cfs_atomic_inc(&os->os_refc);
 			write_unlock(&ofd->ofd_seq_list_lock);
@@ -141,7 +141,7 @@ static struct ofd_seq *ofd_seq_add(const struct lu_env *env,
 		}
 	}
 	cfs_atomic_inc(&new_seq->os_refc);
-	cfs_list_add_tail(&new_seq->os_list, &ofd->ofd_seq_list);
+	list_add_tail(&new_seq->os_list, &ofd->ofd_seq_list);
 	ofd->ofd_seq_count++;
 	write_unlock(&ofd->ofd_seq_list_lock);
 	return new_seq;
@@ -223,7 +223,7 @@ void ofd_seqs_fini(const struct lu_env *env, struct ofd_device *ofd)
 {
 	struct ofd_seq  *oseq;
 	struct ofd_seq  *tmp;
-	cfs_list_t       dispose;
+	struct list_head       dispose;
 	int		rc;
 
 	ofd_deregister_seq_exp(ofd);
@@ -236,19 +236,19 @@ void ofd_seqs_fini(const struct lu_env *env, struct ofd_device *ofd)
 	if (rc != 0)
 		CERROR("%s: fld fini error: rc = %d\n", ofd_name(ofd), rc);
 
-	CFS_INIT_LIST_HEAD(&dispose);
+	INIT_LIST_HEAD(&dispose);
 	write_lock(&ofd->ofd_seq_list_lock);
-	cfs_list_for_each_entry_safe(oseq, tmp, &ofd->ofd_seq_list, os_list) {
-		cfs_list_move(&oseq->os_list, &dispose);
+	list_for_each_entry_safe(oseq, tmp, &ofd->ofd_seq_list, os_list) {
+		list_move(&oseq->os_list, &dispose);
 	}
 	write_unlock(&ofd->ofd_seq_list_lock);
 
-	while (!cfs_list_empty(&dispose)) {
+	while (!list_empty(&dispose)) {
 		oseq = container_of0(dispose.next, struct ofd_seq, os_list);
 		ofd_seq_delete(env, oseq);
 	}
 
-	LASSERT(cfs_list_empty(&ofd->ofd_seq_list));
+	LASSERT(list_empty(&ofd->ofd_seq_list));
 	return;
 }
 
@@ -293,7 +293,7 @@ struct ofd_seq *ofd_seq_load(const struct lu_env *env, struct ofd_device *ofd,
 
 	oseq->os_lastid_obj = dob;
 
-	CFS_INIT_LIST_HEAD(&oseq->os_list);
+	INIT_LIST_HEAD(&oseq->os_list);
 	mutex_init(&oseq->os_create_lock);
 	spin_lock_init(&oseq->os_last_oid_lock);
 	oseq->os_seq = seq;
@@ -412,7 +412,7 @@ int ofd_seqs_init(const struct lu_env *env, struct ofd_device *ofd)
 	}
 
 	rwlock_init(&ofd->ofd_seq_list_lock);
-	CFS_INIT_LIST_HEAD(&ofd->ofd_seq_list);
+	INIT_LIST_HEAD(&ofd->ofd_seq_list);
 	ofd->ofd_seq_count = 0;
 	return rc;
 }
@@ -652,7 +652,7 @@ int ofd_fs_setup(const struct lu_env *env, struct ofd_device *ofd,
 	ofd->ofd_txn_cb.dtc_txn_commit = NULL;
 	ofd->ofd_txn_cb.dtc_cookie = ofd;
 	ofd->ofd_txn_cb.dtc_tag = LCT_DT_THREAD;
-	CFS_INIT_LIST_HEAD(&ofd->ofd_txn_cb.dtc_linkage);
+	INIT_LIST_HEAD(&ofd->ofd_txn_cb.dtc_linkage);
 
 	dt_txn_callback_add(ofd->ofd_osd, &ofd->ofd_txn_cb);
 

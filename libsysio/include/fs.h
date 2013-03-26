@@ -45,6 +45,7 @@
  * File system or volume support.
  */
 
+#include <sys/queue.h>
 struct filesys;
 
 struct pnode;

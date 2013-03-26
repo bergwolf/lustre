@@ -36,6 +36,7 @@
 # include <sys/statfs.h>
 #endif
 
+#include "llite_lib.h"
 #include <liblustre.h>
 
 #include <obd.h>
@@ -46,8 +47,6 @@
 #include <lustre_ver.h>
 #include <lustre_mdc.h>
 #include <cl_object.h>
-
-#include "llite_lib.h"
 
 /*
  * slp_ prefix stands for "Sysio Library Posix". It corresponds to historical
@@ -459,8 +458,8 @@ static struct page *llu_get_user_page(int index, void *addr, int offset,
         page->_offset = offset;
         page->_count = count;
 
-        CFS_INIT_LIST_HEAD(&page->list);
-        CFS_INIT_LIST_HEAD(&page->_node);
+        INIT_LIST_HEAD(&page->list);
+        INIT_LIST_HEAD(&page->_node);
 
         return page;
 }

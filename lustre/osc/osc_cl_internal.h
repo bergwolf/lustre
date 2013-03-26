@@ -134,7 +134,7 @@ struct osc_object {
         /**
          * List of pages in transfer.
          */
-        cfs_list_t         oo_inflight[CRT_NR];
+        struct list_head         oo_inflight[CRT_NR];
         /**
          * Lock, protecting ccc_object::cob_inflight, because a seat-belt is
          * locked during take-off and landing.
@@ -145,10 +145,10 @@ struct osc_object {
 	 * used by the osc to keep track of what objects to build into rpcs.
 	 * Protected by client_obd->cli_loi_list_lock.
 	 */
-	cfs_list_t	   oo_ready_item;
-	cfs_list_t	   oo_hp_ready_item;
-	cfs_list_t	   oo_write_item;
-	cfs_list_t	   oo_read_item;
+	struct list_head	   oo_ready_item;
+	struct list_head	   oo_hp_ready_item;
+	struct list_head	   oo_write_item;
+	struct list_head	   oo_read_item;
 
 	/**
 	 * extent is a red black tree to manage (async) dirty pages.
@@ -157,11 +157,11 @@ struct osc_object {
 	/**
 	 * Manage write(dirty) extents.
 	 */
-	cfs_list_t	   oo_hp_exts; /* list of hp extents */
-	cfs_list_t	   oo_urgent_exts; /* list of writeback extents */
-	cfs_list_t	   oo_rpc_exts;
+	struct list_head	   oo_hp_exts; /* list of hp extents */
+	struct list_head	   oo_urgent_exts; /* list of writeback extents */
+	struct list_head	   oo_rpc_exts;
 
-	cfs_list_t	   oo_reading_exts;
+	struct list_head	   oo_reading_exts;
 
 	cfs_atomic_t	 oo_nr_reads;
 	cfs_atomic_t	 oo_nr_writes;
@@ -376,12 +376,12 @@ struct osc_page {
 		 * lru page list. ops_inflight and ops_lru are exclusive so
 		 * that they can share the same data.
 		 */
-		cfs_list_t	      ops_lru;
+		struct list_head	      ops_lru;
 		/**
 		 * Linkage into a per-osc_object list of pages in flight. For
 		 * debugging.
 		 */
-		cfs_list_t            ops_inflight;
+		struct list_head            ops_inflight;
 	};
         /**
          * Thread that submitted this page for transfer. For debugging.
@@ -448,7 +448,7 @@ int osc_teardown_async_page(const struct lu_env *env, struct osc_object *obj,
 int osc_flush_async_page(const struct lu_env *env, struct cl_io *io,
 			 struct osc_page *ops);
 int osc_queue_sync_pages(const struct lu_env *env, struct osc_object *obj,
-			 cfs_list_t *list, int cmd, int brw_flags);
+			 struct list_head *list, int cmd, int brw_flags);
 int osc_cache_truncate_start(const struct lu_env *env, struct osc_io *oio,
 			     struct osc_object *obj, __u64 size);
 void osc_cache_truncate_end(const struct lu_env *env, struct osc_io *oio,
@@ -624,7 +624,7 @@ struct osc_extent {
 	/** busy if non-zero */
 	cfs_atomic_t       oe_users;
 	/** link list of osc_object's oo_{hp|urgent|locking}_exts. */
-	cfs_list_t	 oe_link;
+	struct list_head	 oe_link;
 	/** state of this extent */
 	unsigned int       oe_state;
 	/** flags for this extent. */
@@ -654,7 +654,7 @@ struct osc_extent {
 	/** # of dirty pages in this extent */
 	unsigned int       oe_nr_pages;
 	/** list of pending oap pages. Pages in this list are NOT sorted. */
-	cfs_list_t         oe_pages;
+	struct list_head         oe_pages;
 	/** Since an extent has to be written out in atomic, this is used to
 	 * remember the next page need to be locked to write this extent out.
 	 * Not used right now.

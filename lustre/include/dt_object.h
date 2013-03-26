@@ -106,7 +106,7 @@ typedef void (*dt_cb_t)(struct lu_env *env, struct thandle *th,
 #define MAX_COMMIT_CB_STR_LEN	32
 
 struct dt_txn_commit_cb {
-	cfs_list_t	dcb_linkage;
+	struct list_head	dcb_linkage;
 	dt_cb_t		dcb_func;
 	__u32		dcb_magic;
 	char		dcb_name[MAX_COMMIT_CB_STR_LEN];
@@ -653,7 +653,7 @@ struct dt_device {
          * way, because callbacks are supposed to be added/deleted only during
          * single-threaded start-up shut-down procedures.
          */
-        cfs_list_t                         dd_txn_callbacks;
+        struct list_head                         dd_txn_callbacks;
 };
 
 int  dt_device_init(struct dt_device *dev, struct lu_device_type *t);
@@ -683,7 +683,7 @@ struct dt_object {
  */
 struct local_oid_storage {
 	/* all initialized llog systems on this node linked by this */
-	cfs_list_t	  los_list;
+	struct list_head	  los_list;
 
 	/* how many handle's reference this los has */
 	cfs_atomic_t	  los_refcount;
@@ -762,7 +762,7 @@ struct thandle {
 	 * will be attached to th_remote_update_list per target.
 	 * Only single thread will access the list, no need lock
 	 */
-	cfs_list_t		th_remote_update_list;
+	struct list_head		th_remote_update_list;
 	struct update_request	*th_current_request;
 };
 
@@ -785,7 +785,7 @@ struct dt_txn_callback {
         void (*dtc_txn_commit)(struct thandle *txn, void *cookie);
         void                *dtc_cookie;
         __u32                dtc_tag;
-        cfs_list_t           dtc_linkage;
+        struct list_head           dtc_linkage;
 };
 
 void dt_txn_callback_add(struct dt_device *dev, struct dt_txn_callback *cb);

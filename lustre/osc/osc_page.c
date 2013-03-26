@@ -127,7 +127,7 @@ static int osc_page_protected(const struct lu_env *env,
                 descr->cld_start = page->cp_index;
                 descr->cld_end   = page->cp_index;
 		spin_lock(&hdr->coh_lock_guard);
-                cfs_list_for_each_entry(scan, &hdr->coh_locks, cll_linkage) {
+                list_for_each_entry(scan, &hdr->coh_locks, cll_linkage) {
                         /*
                          * Lock-less sub-lock has to be either in HELD state
                          * (when io is actively going on), or in CACHED state,
@@ -207,7 +207,7 @@ static void osc_page_transfer_add(const struct lu_env *env,
 	osc_lru_del(osc_cli(obj), opg, false);
 
 	spin_lock(&obj->oo_seatbelt);
-	cfs_list_add(&opg->ops_inflight, &obj->oo_inflight[crt]);
+	list_add(&opg->ops_inflight, &obj->oo_inflight[crt]);
 	opg->ops_submitter = cfs_current();
 	spin_unlock(&obj->oo_seatbelt);
 }
@@ -349,9 +349,9 @@ static int osc_page_fail(const struct lu_env *env,
 }
 
 
-static const char *osc_list(cfs_list_t *head)
+static const char *osc_list(struct list_head *head)
 {
-        return cfs_list_empty(head) ? "-" : "+";
+        return list_empty(head) ? "-" : "+";
 }
 
 static inline cfs_time_t osc_submit_duration(struct osc_page *opg)
@@ -433,8 +433,8 @@ static void osc_page_delete(const struct lu_env *env,
 
 	spin_lock(&obj->oo_seatbelt);
 	if (opg->ops_submitter != NULL) {
-		LASSERT(!cfs_list_empty(&opg->ops_inflight));
-		cfs_list_del_init(&opg->ops_inflight);
+		LASSERT(!list_empty(&opg->ops_inflight));
+		list_del_init(&opg->ops_inflight);
 		opg->ops_submitter = NULL;
 	}
 	spin_unlock(&obj->oo_seatbelt);
@@ -534,8 +534,8 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
 #endif
 	/* ops_inflight and ops_lru are the same field, but it doesn't
 	 * hurt to initialize it twice :-) */
-	CFS_INIT_LIST_HEAD(&opg->ops_inflight);
-	CFS_INIT_LIST_HEAD(&opg->ops_lru);
+	INIT_LIST_HEAD(&opg->ops_inflight);
+	INIT_LIST_HEAD(&opg->ops_lru);
 
 	/* reserve an LRU space for this page */
 	if (page->cp_type == CPT_CACHEABLE && result == 0)
@@ -685,17 +685,17 @@ int osc_lru_shrink(struct client_obd *cli, int target)
 	client_obd_list_lock(&cli->cl_lru_list_lock);
 	cfs_atomic_inc(&cli->cl_lru_shrinkers);
 	maxscan = min(target << 1, cfs_atomic_read(&cli->cl_lru_in_list));
-	while (!cfs_list_empty(&cli->cl_lru_list)) {
+	while (!list_empty(&cli->cl_lru_list)) {
 		struct cl_page *page;
 
 		if (--maxscan < 0)
 			break;
 
-		opg = cfs_list_entry(cli->cl_lru_list.next, struct osc_page,
+		opg = list_entry(cli->cl_lru_list.next, struct osc_page,
 				     ops_lru);
 		page = cl_page_top(opg->ops_cl.cpl_page);
 		if (cl_page_in_use_noref(page)) {
-			cfs_list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
+			list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
 			continue;
 		}
 
@@ -732,7 +732,7 @@ int osc_lru_shrink(struct client_obd *cli, int target)
 		/* move this page to the end of list as it will be discarded
 		 * soon. The page will be finally removed from LRU list in
 		 * osc_page_delete().  */
-		cfs_list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
+		list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
 
 		/* it's okay to grab a refcount here w/o holding lock because
 		 * it has to grab cl_lru_list_lock to delete the page. */
@@ -772,8 +772,8 @@ static void osc_lru_add(struct client_obd *cli, struct osc_page *opg)
 
 	cfs_atomic_dec(&cli->cl_lru_busy);
 	client_obd_list_lock(&cli->cl_lru_list_lock);
-	if (cfs_list_empty(&opg->ops_lru)) {
-		cfs_list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
+	if (list_empty(&opg->ops_lru)) {
+		list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
 		cfs_atomic_inc_return(&cli->cl_lru_in_list);
 		wakeup = cfs_atomic_read(&osc_lru_waiters) > 0;
 	}
@@ -791,9 +791,9 @@ static void osc_lru_del(struct client_obd *cli, struct osc_page *opg, bool del)
 {
 	if (opg->ops_in_lru) {
 		client_obd_list_lock(&cli->cl_lru_list_lock);
-		if (!cfs_list_empty(&opg->ops_lru)) {
+		if (!list_empty(&opg->ops_lru)) {
 			LASSERT(cfs_atomic_read(&cli->cl_lru_in_list) > 0);
-			cfs_list_del_init(&opg->ops_lru);
+			list_del_init(&opg->ops_lru);
 			cfs_atomic_dec(&cli->cl_lru_in_list);
 			if (!del)
 				cfs_atomic_inc(&cli->cl_lru_busy);
@@ -814,7 +814,7 @@ static void osc_lru_del(struct client_obd *cli, struct osc_page *opg, bool del)
 			cfs_waitq_signal(&osc_lru_waitq);
 		}
 	} else {
-		LASSERT(cfs_list_empty(&opg->ops_lru));
+		LASSERT(list_empty(&opg->ops_lru));
 	}
 }
 
@@ -830,7 +830,7 @@ static int osc_lru_reclaim(struct client_obd *cli)
 	int rc;
 
 	LASSERT(cache != NULL);
-	LASSERT(!cfs_list_empty(&cache->ccc_lru));
+	LASSERT(!list_empty(&cache->ccc_lru));
 
 	rc = osc_lru_shrink(cli, lru_shrink_min);
 	if (rc != 0) {
@@ -848,11 +848,11 @@ static int osc_lru_reclaim(struct client_obd *cli)
 	 * from its own. This should rarely happen. */
 	spin_lock(&cache->ccc_lru_lock);
 	cache->ccc_lru_shrinkers++;
-	cfs_list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
+	list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
 
 	max_scans = cfs_atomic_read(&cache->ccc_users);
-	while (--max_scans > 0 && !cfs_list_empty(&cache->ccc_lru)) {
-		cli = cfs_list_entry(cache->ccc_lru.next, struct client_obd,
+	while (--max_scans > 0 && !list_empty(&cache->ccc_lru)) {
+		cli = list_entry(cache->ccc_lru.next, struct client_obd,
 					cl_lru_osc);
 
 		CDEBUG(D_CACHE, "%s: cli %p LRU pages: %d, busy: %d.\n",
@@ -860,7 +860,7 @@ static int osc_lru_reclaim(struct client_obd *cli)
 			cfs_atomic_read(&cli->cl_lru_in_list),
 			cfs_atomic_read(&cli->cl_lru_busy));
 
-		cfs_list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
+		list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
 		if (cfs_atomic_read(&cli->cl_lru_in_list) > 0) {
 			spin_unlock(&cache->ccc_lru_lock);
 
