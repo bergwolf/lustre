@@ -127,8 +127,10 @@ int vvp_conf_set(const struct lu_env *env, struct cl_object *obj,
 		const struct cl_object_conf *conf)
 {
 	struct ll_inode_info *lli = ll_i2info(conf->coc_inode);
+	struct ll_sb_info *sbi = ll_i2sbi(conf->coc_inode);
 
-	if (conf->coc_opc == OBJECT_CONF_INVALIDATE) {
+	if (conf->coc_opc == OBJECT_CONF_INVALIDATE ||
+	    !(sbi->ll_flags & LL_SBI_LAYOUT_LOCK)) {
 		lli->lli_layout_gen = LL_LAYOUT_GEN_NONE;
 		return 0;
 	}
